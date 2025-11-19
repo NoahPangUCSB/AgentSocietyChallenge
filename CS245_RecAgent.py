@@ -36,7 +36,7 @@ class RecommendationAgentCS245(RecommendationAgent):
     def __init__(self, llm: LLMBase):
         super().__init__(llm=llm)
 
-    def workflow(self) -> List[Dict[str, Any]]:
+    def workflow(self) -> list[dict[str, any]]:
         plan = [
          {'description': 'First I need to find user information'},
          {'description': 'Next, I need to find item information'},
