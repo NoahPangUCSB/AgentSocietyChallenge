@@ -8,6 +8,7 @@ from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 import re
 import logging
 import time
+from google.colab import userdata
 
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
@@ -101,18 +102,19 @@ class RecommendationAgentCS245(RecommendationAgent):
             return ['']
         
 if __name__ == "__main__":
-    task_set = "amazon" # "goodreads" or "yelp"
+    task_set = "yelp" # "goodreads" or "yelp"
     # Initialize Simulator
-    simulator = Simulator(data_dir="your data_dir", device="auto", cache=True)
+    simulator = Simulator(data_dir="'/content/Yelp JSON/extracted_dataset'", device="auto", cache=True)
 
     # Load scenarios
     simulator.set_task_and_groundtruth(task_dir=f"./track2/{task_set}/tasks", groundtruth_dir=f"./track2/{task_set}/groundtruth")
 
     # Set your custom agent
-    simulator.set_agent(MyRecommendationAgent)
+    simulator.set_agent(RecommendationAgentCS245)
 
     # Set LLM client
-    simulator.set_llm(InfinigenceLLM(api_key="your api_key"))
+    HF_TOKEN = userdata.get("HF_Token")
+    simulator.set_llm(InfinigenceLLM(api_key=HF_TOKEN))
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.
