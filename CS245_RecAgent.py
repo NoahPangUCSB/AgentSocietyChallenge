@@ -107,7 +107,7 @@ if __name__ == "__main__":
     simulator = Simulator(data_dir="processed_datasets", device="auto", cache=True)
 
     # Load scenarios
-    simulator.set_task_and_groundtruth(task_dir=f"./track2/{task_set}/tasks", groundtruth_dir=f"./track2/{task_set}/groundtruth")
+    simulator.set_task_and_groundtruth(task_dir=f"./example/track2/{task_set}/tasks", groundtruth_dir=f"./example/track2/{task_set}/groundtruth")
 
     # Set your custom agent
     simulator.set_agent(RecommendationAgentCS245)
