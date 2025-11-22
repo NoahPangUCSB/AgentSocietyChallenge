@@ -11,6 +11,14 @@ import time
 import torch
 import os
 
+def num_tokens_from_string(string: str) -> int:
+    encoding = tiktoken.get_encoding("cl100k_base")
+    try:
+        a = len(encoding.encode(string))
+    except:
+        print(encoding.encode(string))
+    return a
+
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
     
