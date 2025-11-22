@@ -19,6 +19,42 @@ def num_tokens_from_string(string: str) -> int:
         print(encoding.encode(string))
     return a
 
+class RecPlanning(PlanningBase):
+    """Inherits from PlanningBase"""
+    
+    def __init__(self, llm):
+        """Initialize the planning module"""
+        super().__init__(llm=llm)
+    
+    def create_prompt(self, task_type, task_description, feedback, few_shot):
+        """Override the parent class's create_prompt method"""
+        if feedback == '':
+            prompt = '''You are a planner who divides a {task_type} task into several subtasks. You also need to give the reasoning instructions for each subtask. Your output format should follow the example below.
+The following are some examples:
+Task: I need to find some information to complete a recommendation task.
+sub-task 1: {{"description": "First I need to find user information", "reasoning instruction": "None"}}
+sub-task 2: {{"description": "Next, I need to find item information", "reasoning instruction": "None"}}
+sub-task 3: {{"description": "Next, I need to find review information", "reasoning instruction": "None"}}
+
+Task: {task_description}
+'''
+            prompt = prompt.format(task_description=task_description, task_type=task_type)
+        else:
+            prompt = '''You are a planner who divides a {task_type} task into several subtasks. You also need to give the reasoning instructions for each subtask. Your output format should follow the example below.
+The following are some examples:
+Task: I need to find some information to complete a recommendation task.
+sub-task 1: {{"description": "First I need to find user information", "reasoning instruction": "None"}}
+sub-task 2: {{"description": "Next, I need to find item information", "reasoning instruction": "None"}}
+sub-task 3: {{"description": "Next, I need to find review information", "reasoning instruction": "None"}}
+
+end
+--------------------
+Reflexion:{feedback}
+Task:{task_description}
+'''
+            prompt = prompt.format(example=few_shot, task_description=task_description, task_type=task_type, feedback=feedback)
+        return prompt
+
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
     
@@ -45,6 +81,8 @@ class RecReasoning(ReasoningBase):
 class RecommendationAgentCS245(RecommendationAgent):
     def __init__(self, llm: LLMBase):
         super().__init__(llm=llm)
+        self.planning = RecPlanning(llm=self.llm)
+        self.reasoning = RecReasoning(profile_type_prompt='', llm=self.llm)
 
     def workflow(self) -> list[dict[str, any]]:
         plan = [
