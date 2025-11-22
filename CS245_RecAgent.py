@@ -2,7 +2,7 @@ import json
 from websocietysimulator import Simulator
 from websocietysimulator.agent import RecommendationAgent
 import tiktoken
-from websocietysimulator.llm import LLMBase, InfinigenceLLM
+from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 import re
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-    simulator.set_llm(InfinigenceLLM(api_key=DEEPSEEK_API_KEY))
+    simulator.set_llm(OpenAILLM(api_key=OPENAI_API_KEY))
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.
