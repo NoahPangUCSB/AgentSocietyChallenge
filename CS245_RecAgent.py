@@ -8,7 +8,8 @@ from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 import re
 import logging
 import time
-from google.colab import userdata
+import torch
+import os
 
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
@@ -102,7 +103,8 @@ class RecommendationAgentCS245(RecommendationAgent):
             return ['']
         
 if __name__ == "__main__":
-    HF_TOKEN = userdata.get("HF_Token")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
     task_set = "yelp" # "goodreads" or "yelp"
     # Initialize Simulator
     simulator = Simulator(data_dir="processed_datasets", device="auto", cache=True)
@@ -114,7 +116,7 @@ if __name__ == "__main__":
     simulator.set_agent(RecommendationAgentCS245)
 
     # Set LLM client
-    
+    HF_TOKEN = os.environ.get("HF_TOKEN")
     simulator.set_llm(InfinigenceLLM(api_key=HF_TOKEN))
 
     # Run evaluation
