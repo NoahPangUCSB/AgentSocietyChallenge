@@ -1,3 +1,3 @@
-from .llm import LLMBase, InfinigenceLLM, OpenAILLM
+from .llm import LLMBase, InfinigenceLLM, OpenAILLM, DeepseekLLM
 
-__all__ = ['LLMBase', 'InfinigenceLLM', 'OpenAILLM']
+__all__ = ['LLMBase', 'InfinigenceLLM', 'OpenAILLM', 'DeepseekLLM']
