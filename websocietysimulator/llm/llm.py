@@ -40,6 +40,77 @@ class LLMBase:
             OpenAIEmbeddings: An instance of OpenAI's text embedding model
         """
         raise NotImplementedError("Subclasses need to implement this method")
+class DeepseekLLM(LLMBase):
+    def __init__(self, api_key: str, model: str = "deepseek-chat"):
+        """
+        Initialize DeepSeek LLM
+        
+        Args:
+            api_key: DeepSeek API key (get from https://platform.deepseek.com)
+            model: Model name, defaults to "deepseek-chat" (DeepSeek-V3)
+                   Use "deepseek-reasoner" for DeepSeek-R1
+        """
+        super().__init__(model)
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.deepseek.com"
+        )
+        # DeepSeek does not currently offer an embedding API. 
+        # If your base class requires this attribute, consider using OpenAI or a local model.
+        self.embedding_model = None 
+        
+    @retry(
+        retry=retry_if_exception_type(Exception),
+        wait=wait_exponential(multiplier=1, min=10, max=300),  # Wait 10s to 300s
+        stop=stop_after_attempt(10)  # Retry up to 10 times
+    )
+    def __call__(self, messages: List[Dict[str, str]], model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 4096, stop_strs: Optional[List[str]] = None, n: int = 1) -> Union[str, List[str]]:
+        """
+        Call DeepSeek API to get response with rate limit handling
+        
+        Args:
+            messages: List of input messages (role/content dicts)
+            model: Optional model override
+            temperature: Defaults to 1.0 (DeepSeek recommends higher temp than OpenAI)
+            max_tokens: Maximum tokens in response
+            stop_strs: Optional list of stop strings
+            n: Number of responses to generate
+            
+        Returns:
+            Union[str, List[str]]: Response text from LLM
+        """
+        try:
+            # DeepSeek uses 'stop' instead of 'stop_strs' in the API call
+            response = self.client.chat.completions.create(
+                model=model or self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stop=stop_strs,
+                n=n,
+                stream=False
+            )
+            
+            if n == 1:
+                return response.choices[0].message.content
+            else:
+                return [choice.message.content for choice in response.choices]
+                
+        except Exception as e:
+            # DeepSeek specific error handling
+            error_msg = str(e)
+            if "429" in error_msg:
+                logger.warning(f"DeepSeek Rate limit exceeded: {error_msg}")
+            elif "402" in error_msg:
+                logger.error("DeepSeek Insufficient Balance: Please top up your account.")
+            else:
+                logger.error(f"DeepSeek LLM Error: {error_msg}")
+            raise e
+    
+    def get_embedding_model(self):
+        if self.embedding_model is None:
+            logger.warning("DeepSeek does not support embeddings. Returning None.")
+        return self.embedding_model
 
 class InfinigenceLLM(LLMBase):
     def __init__(self, api_key: str, model: str = "qwen2.5-72b-instruct"):
