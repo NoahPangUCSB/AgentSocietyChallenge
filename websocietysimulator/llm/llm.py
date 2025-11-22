@@ -40,6 +40,71 @@ class LLMBase:
             OpenAIEmbeddings: An instance of OpenAI's text embedding model
         """
         raise NotImplementedError("Subclasses need to implement this method")
+    
+class OllamaLLM(LLMBase):
+    def __init__(self, model: str = "llama3"):
+        """
+        Initialize Ollama LLM running locally.
+        
+        Args:
+            model: Model name (must be pulled first via 'ollama pull modelname')
+                   Defaults to "llama3"
+        """
+        super().__init__(model)
+        self.client = OpenAI(
+            api_key="ollama", # Required by client but ignored by Ollama
+            base_url="http://localhost:11434/v1" # Points to your local machine
+        )
+        # Ollama does support embeddings, but often requires a specific model (e.g., 'nomic-embed-text').
+        # Setting to None for now to match your other classes.
+        self.embedding_model = None 
+        
+    @retry(
+        retry=retry_if_exception_type(Exception),
+        wait=wait_exponential(multiplier=1, min=2, max=60),  # Wait 2s to 60s
+        stop=stop_after_attempt(5)  # Retry up to 5 times
+    )
+    def __call__(self, messages: List[Dict[str, str]], model: Optional[str] = None, temperature: float = 0.0, max_tokens: int = 2048, stop_strs: Optional[List[str]] = None, n: int = 1) -> Union[str, List[str]]:
+        """
+        Call local Ollama API to get response.
+        
+        Args:
+            messages: List of input messages (role/content dicts)
+            model: Optional model override
+            temperature: Defaults to 0.0 for deterministic outputs
+            max_tokens: Maximum tokens in response
+            stop_strs: Optional list of stop strings
+            n: Number of responses to generate
+            
+        Returns:
+            Union[str, List[str]]: Response text from LLM
+        """
+        try:
+            response = self.client.chat.completions.create(
+                model=model or self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stop=stop_strs,
+                n=n,
+            )
+            
+            if n == 1:
+                return response.choices[0].message.content
+            else:
+                return [choice.message.content for choice in response.choices]
+                
+        except Exception as e:
+            # Basic error handling for local connection issues
+            error_msg = str(e)
+            if "Connection refused" in error_msg:
+                logger.error("Ollama Connection Refused: Is Ollama running? (Run 'ollama serve' in terminal)")
+            else:
+                logger.error(f"Ollama LLM Error: {error_msg}")
+            raise e
+    
+    def get_embedding_model(self):
+        return self.embedding_model
 class DeepseekLLM(LLMBase):
     def __init__(self, api_key: str, model: str = "deepseek-chat"):
         """
