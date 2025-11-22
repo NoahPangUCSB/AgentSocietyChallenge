@@ -165,7 +165,7 @@ if __name__ == "__main__":
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-    simulator.set_llm(InfinigenceLLM(api_key=OPENAI_API_KEY, model="qwen2.5-72b-instruct"))
+    simulator.set_llm(OpenAILLM(api_key=OPENAI_API_KEY, model="qwen2.5-72b-instruct"))
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.
