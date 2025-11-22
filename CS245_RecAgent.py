@@ -165,11 +165,11 @@ if __name__ == "__main__":
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-    simulator.set_llm(DeepseekLLM(api_key=DEEPSEEK_API_KEY))
+    simulator.set_llm(OpenAILLM(api_key=OPENAI_API_KEY))
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.
-    agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers=10)
+    agent_outputs = simulator.run_simulation(number_of_tasks=1, enable_threading=True, max_workers=10)
 
     # Evaluate the agent
     evaluation_results = simulator.evaluate()
