@@ -163,7 +163,8 @@ if __name__ == "__main__":
 
     # Set LLM client
     HF_TOKEN = os.environ.get("HF_TOKEN")
-    simulator.set_llm(InfinigenceLLM(api_key=HF_TOKEN))
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+    simulator.set_llm(InfinigenceLLM(api_key=OPENAI_API_KEY))
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.
