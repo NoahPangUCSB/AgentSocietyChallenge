@@ -133,7 +133,8 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         '''
         result = self.reasoning(task_description)
-
+        print("candidate list: ", self.task['candidate_list'])
+        print("result: ", result)
         try:
             # print('Meta Output:',result)
             match = re.search(r"\[.*\]", result, re.DOTALL)
