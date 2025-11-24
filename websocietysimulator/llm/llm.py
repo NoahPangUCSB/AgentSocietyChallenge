@@ -53,7 +53,7 @@ class OllamaLLM(LLMBase):
         super().__init__(model)
         self.client = OpenAI(
             api_key="ollama", # Required by client but ignored by Ollama
-            base_url="http://localhost:11434/v1" # Points to your local machine
+            base_url="http://127.0.0.1:11434/v1" # Points to your local machine
         )
         # Ollama does support embeddings, but often requires a specific model (e.g., 'nomic-embed-text').
         # Setting to None for now to match your other classes.
