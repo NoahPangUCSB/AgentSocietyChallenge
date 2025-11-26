@@ -6,7 +6,6 @@ from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, Deepseek
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 from websocietysimulator.agent.modules.memory_modules import MemoryBase
-from langchain.docstore.document import Document
 import re
 import logging
 import time
@@ -104,21 +103,21 @@ class RecMemory(MemoryBase):
         # Join trajectories with newlines and return
         return '\n'.join(task_trajectories)
 
-    def addMemory(self, current_situation: str):
-        # Extract task description
-        task_name = current_situation
+    # def addMemory(self, current_situation: str):
+    #     # Extract task description
+    #     task_name = current_situation
         
-        # Create document with metadata
-        memory_doc = Document(
-            page_content=task_name,
-            metadata={
-                "task_name": task_name,
-                "task_trajectory": current_situation
-            }
-        )
+    #     # Create document with metadata
+    #     memory_doc = Document(
+    #         page_content=task_name,
+    #         metadata={
+    #             "task_name": task_name,
+    #             "task_trajectory": current_situation
+    #         }
+    #     )
         
-        # Add to memory store
-        self.scenario_memory.add_documents([memory_doc])
+    #     # Add to memory store
+    #     self.scenario_memory.add_documents([memory_doc])
 
 class RecommendationAgentCS245(RecommendationAgent):
     def __init__(self, llm: LLMBase):
