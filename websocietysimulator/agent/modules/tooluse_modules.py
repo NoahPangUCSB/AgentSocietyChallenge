@@ -2,7 +2,7 @@ import os
 import re
 import ast
 from langchain_chroma import Chroma
-from langchain.docstore.document import Document
+# from langchain.docstore.document import Document
 from .tooluse_pool import tooluse_pool
 
 class ToolUseBase():
