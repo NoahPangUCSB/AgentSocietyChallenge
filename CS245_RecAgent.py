@@ -5,6 +5,8 @@ import tiktoken
 from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, DeepseekLLM, OllamaLLM
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
+from websocietysimulator.agent.modules.memory_modules import MemoryBase
+from langchain.docstore.document import Document
 import re
 import logging
 import time
@@ -62,7 +64,7 @@ class RecReasoning(ReasoningBase):
         """Initialize the reasoning module"""
         super().__init__(profile_type_prompt=profile_type_prompt, memory=None, llm=llm)
         
-    def __call__(self, task_description: str):
+    def __call__(self, user, items, task_description: str, plan: str):
         """Override the parent class's __call__ method"""
         prompt = '''
         {task_description}
@@ -78,6 +80,46 @@ class RecReasoning(ReasoningBase):
         
         return reasoning_result
 
+class RecMemory(MemoryBase):
+    def __init__(self, llm):
+        super().__init__(memory_type='recall', llm=llm)
+
+    def retriveMemory(self, query_scenario: str):
+        # Extract task name from query scenario
+        task_name = query_scenario
+        
+        # Return empty string if memory is empty
+        if self.scenario_memory._collection.count() == 0:
+            return ''
+            
+        # Find most similar memory
+        similarity_results = self.scenario_memory.similarity_search_with_score(
+            task_name, k=1)
+            
+        # Extract task trajectories from results
+        task_trajectories = [
+            result[0].metadata['task_trajectory'] for result in similarity_results
+        ]
+        
+        # Join trajectories with newlines and return
+        return '\n'.join(task_trajectories)
+
+    def addMemory(self, current_situation: str):
+        # Extract task description
+        task_name = current_situation
+        
+        # Create document with metadata
+        memory_doc = Document(
+            page_content=task_name,
+            metadata={
+                "task_name": task_name,
+                "task_trajectory": current_situation
+            }
+        )
+        
+        # Add to memory store
+        self.scenario_memory.add_documents([memory_doc])
+
 class RecommendationAgentCS245(RecommendationAgent):
     def __init__(self, llm: LLMBase):
         super().__init__(llm=llm)
@@ -85,10 +127,32 @@ class RecommendationAgentCS245(RecommendationAgent):
         self.reasoning = RecReasoning(profile_type_prompt='', llm=self.llm)
 
     def workflow(self) -> list[dict[str, any]]:
+        user_id = self.task['user_id']
+        candidate_list = self.task['candidate_list']
+
+        # Retrieve past experience from memory
+        # past_experience = self.memory.retriveMemory(current_situation=f"User {user_id} with candidates {candidate_list}")
+
+        # Formulate plan
+        task_description = '''
+        Please make a plan to rank a list of candidate items for a given user. You can query user, item, and review information with self.interaction_tool functions. 
+        Please note that the final output from the reasoning step should ONLY be a ranked list of item IDs based on the user's preferences. It SHOULD NOT include any explanations or additional text.
+        It SHOULD NOT include any additional item IDs that are not in the candidate list. 
+        
+        The correct output format:
+
+        ['item id1', 'item id2', 'item id3', ...]
+        '''
+        plan = self.planning(task_type='Recommendation Task', task_description="", feedback='', few_shot='')
+        print(plan)
+        # Reasoning and generate final recommendation
+
+
         plan = [
          {'description': 'First I need to find user information'},
          {'description': 'Next, I need to find item information'},
-         {'description': 'Next, I need to find review information'}
+         {'description': 'Next, I need to find review information'},
+         {'description': 'Next, I need to retrieve past experience'}
          ]
 
         user = ''
