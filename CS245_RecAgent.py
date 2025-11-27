@@ -101,8 +101,8 @@ class RecReasoning(ReasoningBase):
 
         reasoning_result = self.llm(
             messages=[
-                {"role": "system", "content": task_description},
-                {"role": "user", "content": f"Based on your reasoning given here: {reasoning_process}, please provide the final recommendation as per the required format: [item_id1, item_id2, ...]. Do not include any additional text."}],
+                {"role": "system", "content": "You are a recommendation agent that makes final recommendations based on the reasoning process, and must give output in the required format: [item_id1, item_id2, ...]. Do not include any additional text."},
+                {"role": "user", "content": f"Based on your reasoning given here: {reasoning_process}, please provide the final ranked list of item IDs from the candidate items: {items} for the user: {user}."}],
                 temperature=0.1,
                 max_tokens=1000)
         
@@ -181,7 +181,7 @@ class RecommendationAgentCS245(RecommendationAgent):
 
 
         plan = [
-         {'description': 'First I need to find user information'},
+         {'description': 'First I need to find the user information'},
          {'description': 'Next, I need to find item information'},
          {'description': 'Next, I need to find review information'},
          {'description': 'Finally, I need to rank the candidate items based on the gathered information'}
