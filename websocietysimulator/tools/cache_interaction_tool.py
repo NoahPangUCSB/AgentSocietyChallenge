@@ -101,6 +101,16 @@ class CacheInteractionTool:
             if item_data:
                 return json.loads(item_data)
         return None
+    
+    def get_items(self, item_ids: List[str] = None) -> List[Dict]:
+        """Fetch multiple items based on a list of item_ids."""
+        items = []
+        with self.item_env.begin() as txn:
+            for item_id in item_ids or []:
+                item_data = txn.get(item_id.encode())
+                if item_data:
+                    items.append(json.loads(item_data))
+        return items
 
     def get_reviews(
             self,
