@@ -84,15 +84,15 @@ class RecReasoning(ReasoningBase):
             llm_output = self.llm(
                 messages=[
                     {"role": "system", "content": task_description},
-                    {"role": "user", "content": step['reasoning instruction']}],
+                    {"role": "user", "content": step}],
                 temperature=0.1,
                 max_tokens=1000,
                 response_format={'type': 'json_object'})
             print("LLM Output:", llm_output)
             action = json.loads(llm_output)
-            if 'tool' in action and action['tool']['name'] in self.tools:
-                tool_name = action['tool']['name']
-                tool_input = action['tool']['input']
+            if 'tool' in action and action['tool'] in self.tools:
+                tool_name = action['tool']
+                tool_input = action['tool_input']
                 tool_output = self.tools[tool_name](**tool_input)
                 print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
                 reasoning_process[step['description']] = tool_output
@@ -224,11 +224,13 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         reasoning_task_description = f'''
         You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
-        You can use the tools {self.tools} to gather necessary information about the user and items. Given each sub-task in the plan, you should create an action that specifies which tool to use and the corresponding input parameters.
+        You can use the tools {self.tools} to gather necessary information about the user and items. You are also given a plan you should follow. For each sub-task in the plan, you should create an action that specifies which tool to use and the corresponding input parameters.
         Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. The format should strictly follow the example below.
         {{
           "thoughts": "Your reasoning here",
-          {{"step": 1, "action": "string", "tool": "optional_tool_name", "tool_input": {{"param1": "value1", "param2": "value2"}}}},
+          "action": "string", 
+          "tool": "optional_tool_name", 
+          "tool_input": {{"param1": "value1", "param2": "value2"}},
         }}    
         '''
         result = self.reasoning(user=user_id, items=candidate_list, plan=plan, task_description=reasoning_task_description)
