@@ -235,7 +235,7 @@ class RecommendationAgentCS245(RecommendationAgent):
         You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
         You can use the tools {self.tools} to gather necessary information about the user and items. If you use a tool, you must specify the tool name and input parameters. The tool name MUST match exactly with one of the tool names provided.
         Make sure the input parameters are in the correct format as expected by the tool.
-        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it. If you need to use a tool, you should specify the tool name under tool_name and input parameters under tool_input.
+        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it. If you need to use a tool, you NEED to specify the tool name under tool_name and input parameters under tool_input, just specifying the tool under action is NOT enough.
         Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. The format should strictly follow the example below.
         {{
           "thoughts": "Your reasoning here",
