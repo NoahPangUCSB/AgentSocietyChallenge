@@ -166,7 +166,7 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         # Formulate plan
         plan_task_description = '''
-        Please make a plan to rank a list of candidate items for a given user. You can query user, item, and review information with {self.tools}.
+        Please make a plan to rank a list of candidate items for a given user. You are given information on the user, their historical reviews, and on the candidate items.
         '''
         plan = self.planning(task_type='Recommendation Task', task_description=plan_task_description, feedback='', few_shot='')
         print(plan)
@@ -223,9 +223,9 @@ class RecommendationAgentCS245(RecommendationAgent):
         '''
 
         reasoning_task_description = f'''
-        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
-        You can use the tools {self.tools} to gather necessary information about the user and items. You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it.
-        If you need to use a tool, you should specify the tool name and input parameters.
+        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user} with user id {user_id} and a list of candidate items to rank: {candidate_list}.
+        The user's historical reviews are given here: {history_review}. The information on the candidate items is given here: {item_list}. You can use the tools {self.tools} to gather necessary information about the user and items. 
+        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it. If you need to use a tool, you should specify the tool name and input parameters.
         Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. The format should strictly follow the example below.
         {{
           "thoughts": "Your reasoning here",
