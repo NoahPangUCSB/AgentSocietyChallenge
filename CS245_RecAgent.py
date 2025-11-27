@@ -85,7 +85,7 @@ class RecReasoning(ReasoningBase):
                 messages=[{"role": "user", "content": step['reasoning instruction']}],
                 temperature=0.1,
                 max_tokens=1000,
-                response_format='json')
+                response_format={'type': 'json_object'})
             print("LLM Output:", llm_output)
             action = json.loads(llm_output)
             if 'tool' in action and action['tool']['name'] in self.tools:
