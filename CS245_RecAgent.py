@@ -239,7 +239,7 @@ class RecommendationAgentCS245(RecommendationAgent):
           "thoughts": "Your reasoning here",
           "action": "string", 
           "tool": "optional_tool_name", 
-          "tool_input": {{"param1": "value1", "param2": "value2"}},
+          "tool_input": [input1, input2, ...],
           "action_output": "string"
         }}    
         '''
