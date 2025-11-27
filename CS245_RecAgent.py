@@ -6,6 +6,7 @@ from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, Deepseek
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 from websocietysimulator.agent.modules.memory_modules import MemoryBase
+from websocietysimulator.agent.modules.tooluse_modules import ToolUseToolFormer
 import re
 import logging
 import time
@@ -184,7 +185,7 @@ class RecommendationAgentCS245(RecommendationAgent):
          {'description': 'First I need to find the user information'},
          {'description': 'Next, I need to find item information'},
          {'description': 'Next, I need to find review information'},
-         {'description': 'Finally, I need to rank the candidate items based on the gathered information'}
+         {'description': 'Finally, I need to come up with a method to rank the items based on the information I have gathered'}
         #  {'description': 'Next, I need to retrieve past experience'}
          ]
 

@@ -115,6 +115,7 @@ class CacheInteractionTool:
     def get_reviews(
             self,
             item_id: Optional[str] = None,
+            item_ids: Optional[List[str]] = None,
             user_id: Optional[str] = None,
             review_id: Optional[str] = None
     ) -> List[Dict]:
@@ -129,6 +130,10 @@ class CacheInteractionTool:
         with self.review_env.begin() as txn:
             if item_id:
                 review_ids = json.loads(txn.get(f"item_{item_id}".encode()) or '[]')
+            elif item_ids:
+                review_ids = []
+                for iid in item_ids:
+                    review_ids.extend(json.loads(txn.get(f"item_{iid}".encode()) or '[]'))
             elif user_id:
                 review_ids = json.loads(txn.get(f"user_{user_id}".encode()) or '[]')
             else:
