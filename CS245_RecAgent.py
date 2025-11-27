@@ -84,7 +84,7 @@ class RecReasoning(ReasoningBase):
             llm_output = self.llm(
                 messages=[
                     {"role": "system", "content": task_description},
-                    {"role": "user", "content": step}],
+                    {"role": "user", "content": step['description']}],
                 temperature=0.1,
                 max_tokens=1000,
                 response_format={'type': 'json_object'})
