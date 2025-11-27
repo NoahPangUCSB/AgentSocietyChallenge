@@ -64,7 +64,7 @@ class OllamaLLM(LLMBase):
         wait=wait_exponential(multiplier=1, min=2, max=60),  # Wait 2s to 60s
         stop=stop_after_attempt(5)  # Retry up to 5 times
     )
-    def __call__(self, messages: List[Dict[str, str]], model: Optional[str] = None, temperature: float = 0.0, max_tokens: int = 2048, stop_strs: Optional[List[str]] = None, n: int = 1) -> Union[str, List[str]]:
+    def __call__(self, messages: List[Dict[str, str]], model: Optional[str] = None, temperature: float = 0.0, max_tokens: int = 2048, stop_strs: Optional[List[str]] = None, n: int = 1, response_format: Optional[Dict[str, str]] = None) -> Union[str, List[str]]:
         """
         Call local Ollama API to get response.
         
@@ -87,6 +87,7 @@ class OllamaLLM(LLMBase):
                 max_tokens=max_tokens,
                 stop=stop_strs,
                 n=n,
+                response_format=response_format
             )
             
             if n == 1:
