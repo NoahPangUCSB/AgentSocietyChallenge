@@ -33,7 +33,7 @@ class RecPlanning(PlanningBase):
             prompt = '''You are a planner who divides a {task_type} task into several subtasks. You also need to give the reasoning instructions for each subtask. Your output format should follow the example below.
             The following are some examples:
             Task: I need to find some information to complete a recommendation task.
-            sub-task 1: {{"description": "First I need to find user information", "reasoning instruction": "None"}}
+            sub-task 1: {{"step": 1, "description": "First I need to find user information", "reasoning instruction": "None"}}
             sub-task 2: {{"description": "Next, I need to find item information", "reasoning instruction": "None"}}
             sub-task 3: {{"description": "Next, I need to find review information", "reasoning instruction": "None"}}
 
@@ -224,13 +224,12 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         reasoning_task_description = f'''
         You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
-        You can use the tools {self.tools} to gather necessary information about the user and items. Follow the plan.
-        Please note that the final output should ONLY be a ranked list of item IDs based on the user's preferences. You SHOULD NOT include any explanations or additional text.
-        You SHOULD NOT include any additional item IDs that are not in the candidate list. 
-        
-        The correct output format:
-
-        ['item id1', 'item id2', 'item id3', ...]        
+        You can use the tools {self.tools} to gather necessary information about the user and items. Given each sub-task in the plan, you should create an action that specifies which tool to use and the corresponding input parameters.
+        Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. The format should strictly follow the example below.
+        {{
+          "thoughts": "Your reasoning here",
+          {{"step": 1, "action": "string", "tool": "optional_tool_name", "tool_input": {{"param1": "value1", "param2": "value2"}}}},
+        }}    
         '''
         result = self.reasoning(user=user_id, items=candidate_list, plan=plan, task_description=reasoning_task_description)
         print("candidate list: ", self.task['candidate_list'])
