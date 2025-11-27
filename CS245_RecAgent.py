@@ -90,15 +90,14 @@ class RecReasoning(ReasoningBase):
                 response_format={'type': 'json_object'})
             print("LLM Output:", llm_output)
             action = json.loads(llm_output)
+            reasoning_process[step['description']] = [action]
             if 'tool' in action and action['tool'] in self.tools:
                 tool_name = action['tool']
                 tool_input = action['tool_input']
                 tool_output = self.tools[tool_name](**tool_input)
                 print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
-                reasoning_process[step['description']] = tool_output
-            else:
-                reasoning_process[step['description']] = action
-
+                reasoning_process[step['description']].append(tool_output)
+            
         reasoning_result = self.llm(
             messages=[
                 {"role": "system", "content": "You are a recommendation agent that makes final recommendations based on the reasoning process, and must give output in the required format: [item_id1, item_id2, ...]. Do not include any additional text."},
@@ -158,10 +157,10 @@ class RecommendationAgentCS245(RecommendationAgent):
     def set_interaction_tool(self, interaction_tool):
         super().set_interaction_tool(interaction_tool) # Call base class method
         self.tools = {
-            "get_user": self.interaction_tool.get_user,
-            "get_item": self.interaction_tool.get_item,
-            "get_items": self.interaction_tool.get_items,
-            "get_reviews": self.interaction_tool.get_reviews
+            "get_user": {"function": self.interaction_tool.get_user, "description": "Fetch user data based on user_id", "parameters": {"user_id": "str"}},
+            "get_item": {"function": self.interaction_tool.get_item, "description": "Fetch item data based on item_id", "parameters": {"item_id": "str"}},
+            "get_items": {"function": self.interaction_tool.get_items, "description": "Fetch multiple items based on a list of item_ids", "parameters": {"item_ids": "List[str]"}},
+            "get_reviews": {"function": self.interaction_tool.get_reviews, "description": "Fetch reviews filtered by various parameters", "parameters": {"item_id": "Optional[str]", "user_id": "Optional[str]", "review_id": "Optional[str]"}},
         }
         self.reasoning = RecReasoning(profile_type_prompt='', llm=self.llm, tools=self.tools)
 
@@ -234,7 +233,7 @@ class RecommendationAgentCS245(RecommendationAgent):
         reasoning_task_description = f'''
         You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
         You can use the tools {self.tools} to gather necessary information about the user and items. If you use a tool, you must specify the tool name and input parameters. The tool name MUST match exactly with one of the tool names provided.
-        Make sure the input parameters are in the correct format as expected by the tool.
+        Make sure the input parameters are in the correct format as expected by the tool. The information about each tool is included in the tool descriptions and parameter information is included as well.
         You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it. If you need to use a tool, you NEED to specify the tool name under tool_name and input parameters under tool_input, just specifying the tool under action is NOT enough.
         Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. The format should strictly follow the example below.
         {{
