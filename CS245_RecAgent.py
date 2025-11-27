@@ -150,12 +150,12 @@ class RecommendationAgentCS245(RecommendationAgent):
     def __init__(self, llm: LLMBase):
         super().__init__(llm=llm)
         self.planning = RecPlanning(llm=self.llm)
-        self.reasoning = RecReasoning(profile_type_prompt='', llm=self.llm)
         self.tools = {
             "get_user": self.interaction_tool.get_user,
             "get_item": self.interaction_tool.get_item,
             "get_reviews": self.interaction_tool.get_reviews
         }
+        self.reasoning = RecReasoning(profile_type_prompt='', llm=self.llm, tools=self.tools)
 
     def workflow(self) -> list[dict[str, any]]:
         user_id = self.task['user_id']
