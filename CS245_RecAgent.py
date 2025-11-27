@@ -99,6 +99,13 @@ class RecReasoning(ReasoningBase):
             else:
                 reasoning_process[step['description']] = action
 
+        reasoning_result = self.llm(
+            messages=[
+                {"role": "system", "content": task_description},
+                {"role": "user", "content": f"Based on your reasoning given here: {reasoning_process}, please provide the final recommendation as per the required format: [item_id1, item_id2, ...]. Do not include any additional text."}],
+                temperature=0.1,
+                max_tokens=1000)
+        
         return reasoning_result
 
 class RecMemory(MemoryBase):
@@ -173,12 +180,13 @@ class RecommendationAgentCS245(RecommendationAgent):
         # Reasoning and generate final recommendation
 
 
-        # plan = [
-        #  {'description': 'First I need to find user information'},
-        #  {'description': 'Next, I need to find item information'},
-        #  {'description': 'Next, I need to find review information'},
+        plan = [
+         {'description': 'First I need to find user information'},
+         {'description': 'Next, I need to find item information'},
+         {'description': 'Next, I need to find review information'},
+         {'description': 'Finally, I need to rank the candidate items based on the gathered information'}
         #  {'description': 'Next, I need to retrieve past experience'}
-        #  ]
+         ]
 
         user = ''
         item_list = []
