@@ -31,37 +31,38 @@ class RecPlanning(PlanningBase):
         """Override the parent class's create_prompt method"""
         if feedback == '':
             prompt = '''You are a planner who divides a {task_type} task into several subtasks. You also need to give the reasoning instructions for each subtask. Your output format should follow the example below.
-The following are some examples:
-Task: I need to find some information to complete a recommendation task.
-sub-task 1: {{"description": "First I need to find user information", "reasoning instruction": "None"}}
-sub-task 2: {{"description": "Next, I need to find item information", "reasoning instruction": "None"}}
-sub-task 3: {{"description": "Next, I need to find review information", "reasoning instruction": "None"}}
+            The following are some examples:
+            Task: I need to find some information to complete a recommendation task.
+            sub-task 1: {{"description": "First I need to find user information", "reasoning instruction": "None"}}
+            sub-task 2: {{"description": "Next, I need to find item information", "reasoning instruction": "None"}}
+            sub-task 3: {{"description": "Next, I need to find review information", "reasoning instruction": "None"}}
 
-Task: {task_description}
-'''
+            Task: {task_description}
+            '''
             prompt = prompt.format(task_description=task_description, task_type=task_type)
         else:
             prompt = '''You are a planner who divides a {task_type} task into several subtasks. You also need to give the reasoning instructions for each subtask. Your output format should follow the example below.
-The following are some examples:
-Task: I need to find some information to complete a recommendation task.
-sub-task 1: {{"description": "First I need to find user information", "reasoning instruction": "None"}}
-sub-task 2: {{"description": "Next, I need to find item information", "reasoning instruction": "None"}}
-sub-task 3: {{"description": "Next, I need to find review information", "reasoning instruction": "None"}}
+            The following are some examples:
+            Task: I need to find some information to complete a recommendation task.
+            sub-task 1: {{"description": "First I need to find user information", "reasoning instruction": "None"}}
+            sub-task 2: {{"description": "Next, I need to find item information", "reasoning instruction": "None"}}
+            sub-task 3: {{"description": "Next, I need to find review information", "reasoning instruction": "None"}}
 
-end
---------------------
-Reflexion:{feedback}
-Task:{task_description}
-'''
+            end
+            --------------------
+            Reflexion:{feedback}
+            Task:{task_description}
+            '''
             prompt = prompt.format(example=few_shot, task_description=task_description, task_type=task_type, feedback=feedback)
         return prompt
 
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
     
-    def __init__(self, profile_type_prompt, llm):
+    def __init__(self, profile_type_prompt, llm, tools):
         """Initialize the reasoning module"""
         super().__init__(profile_type_prompt=profile_type_prompt, memory=None, llm=llm)
+        self.tools = tools
         
     def __call__(self, user, items, task_description: str, plan: str):
         """Override the parent class's __call__ method"""
@@ -76,7 +77,33 @@ class RecReasoning(ReasoningBase):
             temperature=0.1,
             max_tokens=1000
         )
+
+        reasoning_process = {}
+        for step in plan:
+            print("Sub-task:", step['description'])
+            llm_output = self.llm(
+                messages=[{"role": "user", "content": step['reasoning instruction']}],
+                temperature=0.1,
+                max_tokens=1000,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "": {
+                            "name": "string",
+                        }
+                    }
+                })
         
+            action = json.loads(llm_output)
+            if 'tool' in action and action['tool']['name'] in self.tools:
+                tool_name = action['tool']['name']
+                tool_input = action['tool']['input']
+                tool_output = self.tools[tool_name](**tool_input)
+                print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
+                reasoning_process[step['description']] = tool_output
+            else:
+                reasoning_process[step['description']] = action
+
         return reasoning_result
 
 class RecMemory(MemoryBase):
@@ -124,6 +151,11 @@ class RecommendationAgentCS245(RecommendationAgent):
         super().__init__(llm=llm)
         self.planning = RecPlanning(llm=self.llm)
         self.reasoning = RecReasoning(profile_type_prompt='', llm=self.llm)
+        self.tools = {
+            "get_user": self.interaction_tool.get_user,
+            "get_item": self.interaction_tool.get_item,
+            "get_reviews": self.interaction_tool.get_reviews
+        }
 
     def workflow(self) -> list[dict[str, any]]:
         user_id = self.task['user_id']
@@ -133,16 +165,10 @@ class RecommendationAgentCS245(RecommendationAgent):
         # past_experience = self.memory.retriveMemory(current_situation=f"User {user_id} with candidates {candidate_list}")
 
         # Formulate plan
-        task_description = '''
-        Please make a plan to rank a list of candidate items for a given user. You can query user, item, and review information with self.interaction_tool functions. 
-        Please note that the final output from the reasoning step should ONLY be a ranked list of item IDs based on the user's preferences. It SHOULD NOT include any explanations or additional text.
-        It SHOULD NOT include any additional item IDs that are not in the candidate list. 
-        
-        The correct output format:
-
-        ['item id1', 'item id2', 'item id3', ...]
+        plan_task_description = '''
+        Please make a plan to rank a list of candidate items for a given user. You can query user, item, and review information with {self.tools}.
         '''
-        plan = self.planning(task_type='Recommendation Task', task_description="", feedback='', few_shot='')
+        plan = self.planning(task_type='Recommendation Task', task_description=plan_task_description, feedback='', few_shot='')
         print(plan)
         # Reasoning and generate final recommendation
 
@@ -195,7 +221,17 @@ class RecommendationAgentCS245(RecommendationAgent):
         ['item id1', 'item id2', 'item id3', ...]
 
         '''
-        result = self.reasoning(task_description)
+
+        reasoning_task_description = f'''
+        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
+        Please note that the final output from should ONLY be a ranked list of item IDs based on the user's preferences. You SHOULD NOT include any explanations or additional text.
+        You SHOULD NOT include any additional item IDs that are not in the candidate list. 
+        
+        The correct output format:
+
+        ['item id1', 'item id2', 'item id3', ...]        
+        '''
+        result = self.reasoning(user=user_id, items=candidate_list, plan=plan, task_description=reasoning_task_description, tools=self.tools)
         print("candidate list: ", self.task['candidate_list'])
         print("result: ", result)
         print("item_list: ", item_list)
