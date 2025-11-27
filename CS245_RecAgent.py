@@ -82,7 +82,9 @@ class RecReasoning(ReasoningBase):
         for step in plan:
             print("Sub-task:", step['description'])
             llm_output = self.llm(
-                messages=[{"role": "user", "content": step['reasoning instruction']}],
+                messages=[
+                    {"role": "system", "content": task_description},
+                    {"role": "user", "content": step['reasoning instruction']}],
                 temperature=0.1,
                 max_tokens=1000,
                 response_format={'type': 'json_object'})
@@ -222,7 +224,7 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         reasoning_task_description = f'''
         You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
-        You can use the tools {self.tools} to gather necessary information about the user and items.
+        You can use the tools {self.tools} to gather necessary information about the user and items. Follow the plan.
         Please note that the final output should ONLY be a ranked list of item IDs based on the user's preferences. You SHOULD NOT include any explanations or additional text.
         You SHOULD NOT include any additional item IDs that are not in the candidate list. 
         
