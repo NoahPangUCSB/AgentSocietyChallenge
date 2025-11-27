@@ -45,6 +45,10 @@ class InteractionTool:
     def get_user(self, user_id: str) -> Optional[Dict]:
         """Fetch user data based on user_id."""
         return self.user_data.get(user_id)
+    
+    def get_items(self, item_ids: List[str] = None) -> List[Dict]:
+        """Fetch multiple items based on a list of item_ids."""
+        return [self.item_data.get(item_id) for item_id in item_ids] if item_ids else []
 
     def get_item(self, item_id: str = None) -> Optional[Dict]:
         """Fetch item data based on item_id."""
