@@ -179,12 +179,12 @@ class RecommendationAgentCS245(RecommendationAgent):
         # Reasoning and generate final recommendation
 
 
-        plan = [
-         {'description': 'First I need to find user information'},
-         {'description': 'Next, I need to find item information'},
-         {'description': 'Next, I need to find review information'},
-         {'description': 'Next, I need to retrieve past experience'}
-         ]
+        # plan = [
+        #  {'description': 'First I need to find user information'},
+        #  {'description': 'Next, I need to find item information'},
+        #  {'description': 'Next, I need to find review information'},
+        #  {'description': 'Next, I need to retrieve past experience'}
+        #  ]
 
         user = ''
         item_list = []
