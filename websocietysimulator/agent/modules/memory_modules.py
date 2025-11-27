@@ -1,7 +1,7 @@
 import os
 import re
 from langchain_chroma import Chroma
-# from langchain.docstore.document import Document
+from langchain.docstore.document import Document
 import shutil
 import uuid
 
