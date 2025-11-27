@@ -88,12 +88,13 @@ class RecReasoning(ReasoningBase):
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
-                        "": {
+                        "tool": {
                             "name": "string",
+                            "input": ["any"]
                         }
                     }
                 })
-        
+            print("LLM Output:", llm_output)
             action = json.loads(llm_output)
             if 'tool' in action and action['tool']['name'] in self.tools:
                 tool_name = action['tool']['name']
@@ -229,14 +230,15 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         reasoning_task_description = f'''
         You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
-        Please note that the final output from should ONLY be a ranked list of item IDs based on the user's preferences. You SHOULD NOT include any explanations or additional text.
+        You can use the tools {self.tools} to gather necessary information about the user and items.
+        Please note that the final output should ONLY be a ranked list of item IDs based on the user's preferences. You SHOULD NOT include any explanations or additional text.
         You SHOULD NOT include any additional item IDs that are not in the candidate list. 
         
         The correct output format:
 
         ['item id1', 'item id2', 'item id3', ...]        
         '''
-        result = self.reasoning(user=user_id, items=candidate_list, plan=plan, task_description=reasoning_task_description, tools=self.tools)
+        result = self.reasoning(user=user_id, items=candidate_list, plan=plan, task_description=reasoning_task_description)
         print("candidate list: ", self.task['candidate_list'])
         print("result: ", result)
         print("item_list: ", item_list)
