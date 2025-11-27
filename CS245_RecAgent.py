@@ -150,6 +150,11 @@ class RecommendationAgentCS245(RecommendationAgent):
     def __init__(self, llm: LLMBase):
         super().__init__(llm=llm)
         self.planning = RecPlanning(llm=self.llm)
+        self.tools = {}
+        self.reasoning = None
+
+    def set_interaction_tool(self, interaction_tool):
+        super().set_interaction_tool(interaction_tool) # Call base class method
         self.tools = {
             "get_user": self.interaction_tool.get_user,
             "get_item": self.interaction_tool.get_item,
