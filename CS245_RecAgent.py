@@ -101,8 +101,8 @@ class RecReasoning(ReasoningBase):
             
         reasoning_result = self.llm(
             messages=[
-                {"role": "system", "content": "You are a recommendation agent that makes final recommendations based on the reasoning process, and must give output in the required format: [item_id1, item_id2, ...]. Do not include any additional text."},
-                {"role": "user", "content": f"Based on your reasoning given here: {reasoning_process}, please provide the final ranked list of item IDs from the candidate items: {items} for the user: {user}."}],
+                {"role": "system", "content": "You are a recommendation agent that makes final recommendations based on the reasoning process, and must give output in the required format: [item_id1, item_id2, ...]. Do NOT include any additional text."},
+                {"role": "user", "content": f"Based on your reasoning given here: {reasoning_process}, please provide the final ranked list of item IDs from the candidate items: {items} for the user: {user} in the correct format."}],
                 temperature=0.1,
                 max_tokens=1000)
         
