@@ -94,7 +94,7 @@ class RecReasoning(ReasoningBase):
             if 'tool' in action and action['tool'] in self.tools:
                 tool_name = action['tool']
                 tool_input = action['tool_input']
-                tool_output = self.tools[tool_name](**tool_input)
+                tool_output = self.tools[tool_name]['function'](**tool_input)
                 print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
                 reasoning_process[step['description']].append(tool_output)
             
