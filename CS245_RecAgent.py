@@ -535,21 +535,21 @@ class RecommendationAgentCS245(RecommendationAgent):
         # --- PLANNING: multi-plan + selection, with global feedback ---
 
         plan_task_description = f"""
-Please make a plan to rank a list of candidate items for a given user.
+        Please make a plan to rank a list of candidate items for a given user.
 
-You will later have access to tools:
-- get_user(user_id) to fetch user information
-- get_item(item_id) / get_items(item_ids) to fetch item information
-- get_reviews(user_id=..., item_id=...) to fetch review information
+        You will later have access to tools:
+        - get_user(user_id) to fetch user information
+        - get_item(item_id) / get_items(item_ids) to fetch item information
+        - get_reviews(user_id=..., item_id=...) to fetch review information
 
-You are given a user with id: {user_id} and a list of candidate item IDs: {candidate_list}.
-Your plan should describe:
-  1) how to obtain user information,
-  2) how to obtain candidate item information,
-  3) how to obtain review information (for user and/or items),
-  4) how to design a ranking method based on this information,
-  5) how to apply the ranking method to produce a ranked list.
-"""
+        You are given a user with id: {user_id} and a list of candidate item IDs: {candidate_list}.
+        Your plan should describe:
+          1) how to obtain user information,
+          2) how to obtain candidate item information,
+          3) how to obtain review information (for user and/or items),
+          4) how to design a ranking method based on this information,
+          5) how to apply the ranking method to produce a ranked list.
+        """
         plan = self.planning(
             task_type='Recommendation Task',
             task_description=plan_task_description,
@@ -613,40 +613,40 @@ Your plan should describe:
         # --- TASK DESCRIPTION FOR FINAL REASONING / RANKING ---
 
         task_description = f"""
-You are a real user on an online platform. Your historical item review text and stars are as follows: {history_review}. 
-Now you need to rank the following items: {candidate_list} according to their match degree to your preference.
-Please rank the more interesting items earlier in your ranked list.
-The information of these candidate items is as follows: {item_list}.
+        You are a real user on an online platform. Your historical item review text and stars are as follows: {history_review}. 
+        Now you need to rank the following items: {candidate_list} according to their match degree to your preference.
+        Please rank the more interesting items earlier in your ranked list.
+        The information of these candidate items is as follows: {item_list}.
 
-Your final output should be ONLY a ranked item list of {candidate_list} with the following format, DO NOT introduce any other item ids!
-DO NOT output your analysis process!
+        Your final output should be ONLY a ranked item list of {candidate_list} with the following format, DO NOT introduce any other item ids!
+        DO NOT output your analysis process!
 
-The correct output format:
+        The correct output format:
 
-['item id1', 'item id2', 'item id3', ...]
-"""
+        ['item id1', 'item id2', 'item id3', ...]
+        """
 
         reasoning_task_description = f"""
-You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences.
-You are given the user id: {user_id} and a list of candidate items to rank: {candidate_list}.
+        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences.
+        You are given the user id: {user_id} and a list of candidate items to rank: {candidate_list}.
 
-You can use the tools {self.tools} to gather necessary information about the user and items. 
-If you use a tool, you must specify the tool name and input parameters. The tool name MUST match exactly with one of the tool names provided.
-Make sure the input parameters are in the correct format as expected by the tool.
+        You can use the tools {self.tools} to gather necessary information about the user and items. 
+        If you use a tool, you must specify the tool name and input parameters. The tool name MUST match exactly with one of the tool names provided.
+        Make sure the input parameters are in the correct format as expected by the tool.
 
-You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it.
-If you need to use a tool, you NEED to specify the tool name under "tool" and input parameters under "tool_input" — just specifying the tool under "action" is NOT enough.
+        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it.
+        If you need to use a tool, you NEED to specify the tool name under "tool" and input parameters under "tool_input" — just specifying the tool under "action" is NOT enough.
 
-Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. 
-The format should strictly follow the example below:
+        Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. 
+        The format should strictly follow the example below:
 
-{
-  "thoughts": "Your reasoning here",
-  "action": "string", 
-  "tool": "tool_name", 
-  "tool_input": { "input1": "value1", "input2": "value2", ... }
-}
-"""
+        {{
+          "thoughts": "Your reasoning here",
+          "action": "string", 
+          "tool": "tool_name", 
+          "tool_input": {{ "input1": "value1", "input2": "value2", ... }}
+        }}
+        """
 
         result = self.reasoning(
             user=user_id,
