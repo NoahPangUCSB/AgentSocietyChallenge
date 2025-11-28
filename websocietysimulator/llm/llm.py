@@ -88,7 +88,7 @@ class OllamaLLM(LLMBase):
                 max_tokens=max_tokens,
                 stop=stop_strs,
                 n=n,
-                response_format=response_format
+                format=response_format
             )
             
             if n == 1:

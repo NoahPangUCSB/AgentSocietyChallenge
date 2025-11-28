@@ -295,33 +295,33 @@ class RecPlanning(PlanningBase):
         critic_input_str = json.dumps(critic_input, ensure_ascii=False, indent=2)
 
         prompt = f"""
-You are evaluating planning strategies for a recommendation agent.
+        You are evaluating planning strategies for a recommendation agent.
 
-Task type:
-{task_type}
+        Task type:
+        {task_type}
 
-Task description:
-\"\"\"{task_description}\"\"\" 
+        Task description:
+        \"\"\"{task_description}\"\"\" 
 
-Previous feedback (may be empty):
-\"\"\"{feedback}\"\"\" 
+        Previous feedback (may be empty):
+        \"\"\"{feedback}\"\"\" 
 
-Candidate plans (JSON list):
-{critic_input_str}
+        Candidate plans (JSON list):
+        {critic_input_str}
 
-For each plan, consider:
-  - Does it clearly separate user / item / review steps?
-  - Does it follow the required keyword constraints?
-  - Does it gather enough information before designing a ranking method?
-  - Does it design and apply a reasonable ranking step?
+        For each plan, consider:
+          - Does it clearly separate user / item / review steps?
+          - Does it follow the required keyword constraints?
+          - Does it gather enough information before designing a ranking method?
+          - Does it design and apply a reasonable ranking step?
 
-Return ONLY a JSON object:
+        Return ONLY a JSON object:
 
-{{
-  "best_id": <int>,           // index of the best plan in the list
-  "justification": "<why this plan is best>"
-}}
-"""
+        {{
+          "best_id": <int>,           // index of the best plan in the list
+          "justification": "<why this plan is best>"
+        }}
+        """
         critic_output = self.llm(
             messages=[
                 {"role": "system", "content": "You are a critical evaluator of planning strategies."},
@@ -403,7 +403,16 @@ class RecReasoning(ReasoningBase):
                 ],
                 temperature=0.1,
                 max_tokens=1000,
-                response_format={'type': 'json_object'},
+                response_format={"type": "json_schema",
+                                  "json_schema": {
+                                    "thoughts": "string",
+                                    "action": "string",
+                                    "tool": "string",
+                                    "tool_input": {
+                                      "type": "string",
+                                    },
+                                    "required": ["thoughts", "action"]
+                                  }},
             )
             print("LLM Output:", llm_output)
             action = json.loads(llm_output)
