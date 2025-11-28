@@ -443,13 +443,10 @@ class RecReasoning(ReasoningBase):
                     'ranked_ids': ['item id1', 'item id2', 'item id3', ...]
                   }}
                   Only output the JSON, do NOT output any other text.
-                  Analysis should be your chain of thought. Resulting ranked_ids must be based on the analysis and only include items from the candidate list.''',
-                },
-            ],
-            temperature=0.1,
-            max_tokens=1000,
-        )
-
+                  Analysis should be your chain of thought. Resulting ranked_ids must be based on the analysis and only include items from the candidate list.'''}],
+                temperature=0.1,
+                max_tokens=1500)
+        
         return reasoning_result
 
 
