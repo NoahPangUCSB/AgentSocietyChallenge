@@ -105,12 +105,15 @@ class RecReasoning(ReasoningBase):
                   You must always follow this format:
 
                   - You MAY think freely between <reasoning> tags. This will NOT be shown to the user.
-                  - Your FINAL output must be a strict list following the schema provided in the final instruction.
+                  - Your FINAL output must be a strict list following the format provided in the final instruction.
 
                   You MUST NOT output code, functions, or explanations in the final response.
                   Only a list.
+                  If your output is not a valid list EXACTLY matching the format, regenerate it until it is valid.
+                  Never output code.
+                  Never output natural language.
                  '''},
-                {"role": "user", "content": f"Please use the reasoning given here: {reasoning_process} to calculate a ranking of item IDs from the candidate items: {items} for the user: {user}. Your output should be ONLY a ranked item list of {items} with the following format, DO NOT introduce any other item ids! DO NOT output your analysis process! The correct output format: ['item id1', 'item id2', 'item id3', ...]"}],
+                {"role": "user", "content": f"Please use the reasoning given here: {reasoning_process} to calculate a ranking of item IDs from the candidate items: {items} for the user: {user}. Your output should be ONLY a ranked item list of {items} with the following format: ['item id1', 'item id2', 'item id3', ...]. DO NOT introduce any other item ids! DO NOT output your analysis process!"}],
                 temperature=0.1,
                 max_tokens=1000)
         
