@@ -165,31 +165,31 @@ class RecPlanning(PlanningBase):
 
         Your output MUST be valid JSON with the following structure:
 
-        {
+        {{
           "rationale": "short natural language rationale",
           "steps": [
-            {
+            {{
               "description": "First I need to gather user information",
               "reasoning_instruction": "optional reasoning guidance for this step"
-            },
-            {
+            }},
+            {{
               "description": "Next, I need to gather item information",
               "reasoning_instruction": "..."
-            },
-            {
+            }},
+            {{
               "description": "Next, I need to gather review information",
               "reasoning_instruction": "..."
-            },
-            {
+            }},
+            {{
               "description": "Next, I need to design a ranking method based on the collected information",
               "reasoning_instruction": "..."
-            },
-            {
+            }},
+            {{
               "description": "Finally, I need to apply the ranking method to produce the final ranked list",
               "reasoning_instruction": "..."
-            }
+            }}
           ]
-        }
+        }}
 
         Only output JSON. Do NOT include any extra text outside the JSON.
         """.format(task_type=task_type, candidate_index=candidate_index + 1)
