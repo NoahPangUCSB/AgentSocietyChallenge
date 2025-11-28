@@ -13,82 +13,398 @@ import time
 import torch
 import os
 
+
+
 def num_tokens_from_string(string: str) -> int:
     encoding = tiktoken.get_encoding("cl100k_base")
     try:
         a = len(encoding.encode(string))
-    except:
+    except Exception:
         print(encoding.encode(string))
+        a = 0
     return a
 
+
+# =========================
+#      PLANNING MODULE
+# =========================
+
 class RecPlanning(PlanningBase):
-    """Inherits from PlanningBase"""
-    
-    def __init__(self, llm):
-        """Initialize the planning module"""
+    """
+    Planning module for the CS245 recommendation agent.
+
+    Features:
+      - Generates multiple candidate plans and uses the LLM as a critic
+        to select the best one (multi-planning + selection).
+      - Uses STRICT, EXCLUSIVE keyword constraints so downstream code
+        can parse steps reliably.
+      - Can condition on global feedback to refine planning over runs.
+    """
+
+    def __init__(self, llm: LLMBase, num_candidate_plans: int = 2):
         super().__init__(llm=llm)
-    
-    def create_prompt(self, task_type, task_description, feedback, few_shot):
-        """Override the parent class's create_prompt method"""
-        if feedback == '':
-            prompt = '''You are a planner who divides a {task_type} task into several subtasks. You also need to give the reasoning instructions for each subtask. Your output format should follow the example below.
-            The following are some examples:
-            Task: I need to find some information to complete a recommendation task.
-            sub-task 1: {{"step": 1, "description": "First I need to find user information", "reasoning instruction": "None"}}
-            sub-task 2: {{"description": "Next, I need to find item information", "reasoning instruction": "None"}}
-            sub-task 3: {{"description": "Next, I need to find review information", "reasoning instruction": "None"}}
+        self.num_candidate_plans = max(1, num_candidate_plans)
 
-            Task: {task_description}
-            '''
-            prompt = prompt.format(task_description=task_description, task_type=task_type)
+    def __call__(self, task_type: str, task_description: str,
+                 feedback: str = '', few_shot: str = '') -> list[dict]:
+        """
+        Main entry point. Generates multiple candidate plans, then selects
+        the best one using an LLM-based critic.
+        Returns a single chosen plan as a list of steps (dicts with 'description').
+        """
+        candidate_plans = []
+        print("Generating candidate plans...")
+        for i in range(self.num_candidate_plans):
+            prompt = self._build_planning_prompt(
+                task_type=task_type,
+                task_description=task_description,
+                feedback=feedback,
+                few_shot=few_shot,
+                candidate_index=i,
+            )
+
+            llm_output = self.llm(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are the PLANNING MODULE for a recommendation agent. "
+                            "Your job is ONLY to create a JSON plan for how the agent should proceed."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+                temperature=0.3,  # small diversity to get different plans
+                max_tokens=800,
+            )
+
+            plan_dict = self._parse_plan_from_llm_output(llm_output)
+            if plan_dict["steps"]:
+                candidate_plans.append(plan_dict)
+
+        # If no candidate plan parses correctly, fall back to a safe static plan.
+        if not candidate_plans:
+            return self._default_plan()
+
+        # If only one candidate, just use it.
+        if len(candidate_plans) == 1:
+            return candidate_plans[0]["steps"]
+
+        # Otherwise, use LLM as critic to select best plan.
+        best_idx = self._select_best_plan_index(
+            candidate_plans=candidate_plans,
+            task_type=task_type,
+            task_description=task_description,
+            feedback=feedback,
+        )
+        best_idx = max(0, min(best_idx, len(candidate_plans) - 1))
+        print("Selected plan index:", best_idx)
+        return candidate_plans[best_idx]["steps"]
+
+    # ---- Prompt construction ----
+
+    def _build_planning_prompt(
+        self,
+        task_type: str,
+        task_description: str,
+        feedback: str,
+        few_shot: str,
+        candidate_index: int = 0,
+    ) -> str:
+        """
+        Build the planning prompt with STRICT, EXCLUSIVE keyword constraints.
+        """
+        print("Building planning prompt for candidate index:", candidate_index)
+
+        base_instructions = """
+        You are a planner who divides a {task_type} into several clear sub-tasks.
+        Each sub-task should describe a concrete action the agent should take.
+
+        You are generating CANDIDATE PLAN #{candidate_index}.
+
+        DOWNSTREAM MODULES WILL PARSE THE STEP DESCRIPTIONS USING SIMPLE KEYWORD RULES.
+        So you MUST follow these STRICT and EXCLUSIVE constraints:
+
+          1. Steps about USER information:
+            - The description MUST contain the word "user".
+            - The description MUST NOT contain the words "item" or "review".
+            - Example (valid): "First I need to gather user information"
+            - Example (invalid): "I need to get user and item data"
+
+          2. Steps about ITEM information:
+            - The description MUST contain the word "item".
+            - The description MUST NOT contain the words "user" or "review".
+            - Example (valid): "Next, I need to gather item information"
+            - Example (invalid): "I need to inspect user-item interactions"
+
+          3. Steps about REVIEW information:
+            - The description MUST contain the word "review".
+            - The description MUST NOT contain the words "user" or "item".
+            - Example (valid): "Next, I need to gather review information"
+            - Example (invalid): "I need to check user review history"
+
+          4. Steps about designing or applying a ranking method:
+            - The description MUST NOT contain the words "user", "item", or "review".
+            - Example (valid): "Next, I need to design a ranking method based on the collected information"
+            - Example (valid): "Finally, I need to apply the ranking method to produce the final ranked list"
+
+          5. The plan should have between 4 and 6 sub-tasks, and MUST include:
+            - At least one USER-only step (rule 1)
+            - At least one ITEM-only step (rule 2)
+            - At least one REVIEW-only step (rule 3)
+            - At least one ranking-related step (rule 4)
+
+        The plan is for a recommendation scenario where the agent will:
+          1) gather user information,
+          2) gather candidate item information,
+          3) gather review information,
+          4) design a ranking method,
+          5) apply the ranking method.
+
+        Your output MUST be valid JSON with the following structure:
+
+        {{
+          "rationale": "short natural language rationale",
+          "steps": [
+            {{
+              "description": "First I need to gather user information",
+              "reasoning_instruction": "optional reasoning guidance for this step"
+            }},
+            {{
+              "description": "Next, I need to gather item information",
+              "reasoning_instruction": "..."
+            }},
+            {{
+              "description": "Next, I need to gather review information",
+              "reasoning_instruction": "..."
+            }},
+            {{
+              "description": "Next, I need to design a ranking method based on the collected information",
+              "reasoning_instruction": "..."
+            }},
+            {{
+              "description": "Finally, I need to apply the ranking method to produce the final ranked list",
+              "reasoning_instruction": "..."
+            }}
+          ]
+        }}
+
+        Only output JSON. Do NOT include any extra text outside the JSON.
+        """.format(task_type=task_type, candidate_index=candidate_index + 1)
+
+        print("Base instructions prepared.")
+        if feedback:
+            prompt = f"""{base_instructions}
+
+            Here is feedback from previous attempts at similar tasks (Reflexion):
+            \"\"\"{feedback}\"\"\" 
+
+            Use this feedback to improve this candidate plan.
+
+            Current task description:
+            \"\"\"{task_description}\"\"\" 
+            """
         else:
-            prompt = '''You are a planner who divides a {task_type} task into several subtasks. You also need to give the reasoning instructions for each subtask. Your output format should follow the example below.
-            The following are some examples:
-            Task: I need to find some information to complete a recommendation task.
-            sub-task 1: {{"description": "First I need to find user information", "reasoning instruction": "None"}}
-            sub-task 2: {{"description": "Next, I need to find item information", "reasoning instruction": "None"}}
-            sub-task 3: {{"description": "Next, I need to find review information", "reasoning instruction": "None"}}
+            prompt = f"""{base_instructions}
 
-            end
-            --------------------
-            Reflexion:{feedback}
-            Task:{task_description}
-            '''
-            prompt = prompt.format(example=few_shot, task_description=task_description, task_type=task_type, feedback=feedback)
+            Current task description:
+            \"\"\"{task_description}\"\"\" 
+            """
+        print("Prompt with feedback prepared.")
+        if few_shot:
+            prompt += f"""
+
+            You may find the following example(s) helpful:
+            {few_shot}
+            """
+
         return prompt
+
+    # ---- Parsing helpers ----
+
+    def _parse_plan_from_llm_output(self, llm_output: str) -> dict:
+        """
+        Parse the LLM output into a dict with keys:
+          - "rationale": str
+          - "steps": list[{"description": ..., "reasoning_instruction": ...}]
+        """
+        text = llm_output.strip()
+        data = None
+        print("Parsing plan from LLM output:", text)
+        try:
+            data = json.loads(text)
+        except Exception:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1 and start < end:
+                snippet = text[start: end + 1]
+                try:
+                    data = json.loads(snippet)
+                except Exception:
+                    data = None
+
+        if not isinstance(data, dict):
+            return {"rationale": "Parsing failed", "steps": []}
+
+        raw_steps = data.get("steps", [])
+        if not isinstance(raw_steps, list):
+            return {"rationale": "No steps list", "steps": []}
+
+        rationale = str(data.get("rationale", "")).strip()
+
+        steps: list[dict] = []
+        for step in raw_steps:
+            desc = str(step.get("description", "")).strip()
+            if not desc:
+                continue
+            steps.append(
+                {
+                    "description": desc,
+                    "reasoning_instruction": step.get("reasoning_instruction", ""),
+                }
+            )
+
+        return {"rationale": rationale, "steps": steps}
+
+    def _select_best_plan_index(
+        self,
+        candidate_plans: list[dict],
+        task_type: str,
+        task_description: str,
+        feedback: str,
+    ) -> int:
+        """
+        Ask the LLM to pick the best plan among candidate_plans.
+        Returns an integer index into candidate_plans.
+        """
+        print("Selecting best plan among", len(candidate_plans), "candidates...")
+        # Compact representation for the critic
+        critic_input = []
+        for i, plan in enumerate(candidate_plans):
+            critic_input.append(
+                {
+                    "id": i,
+                    "rationale": plan["rationale"],
+                    "steps": [s["description"] for s in plan["steps"]],
+                }
+            )
+
+        critic_input_str = json.dumps(critic_input, ensure_ascii=False, indent=2)
+
+        prompt = f"""
+You are evaluating planning strategies for a recommendation agent.
+
+Task type:
+{task_type}
+
+Task description:
+\"\"\"{task_description}\"\"\" 
+
+Previous feedback (may be empty):
+\"\"\"{feedback}\"\"\" 
+
+Candidate plans (JSON list):
+{critic_input_str}
+
+For each plan, consider:
+  - Does it clearly separate user / item / review steps?
+  - Does it follow the required keyword constraints?
+  - Does it gather enough information before designing a ranking method?
+  - Does it design and apply a reasonable ranking step?
+
+Return ONLY a JSON object:
+
+{{
+  "best_id": <int>,           // index of the best plan in the list
+  "justification": "<why this plan is best>"
+}}
+"""
+        critic_output = self.llm(
+            messages=[
+                {"role": "system", "content": "You are a critical evaluator of planning strategies."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0,
+            max_tokens=400,
+        )
+
+        text = critic_output.strip()
+        best_id = 0
+
+        try:
+            data = json.loads(text)
+        except Exception:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1 and start < end:
+                snippet = text[start: end + 1]
+                try:
+                    data = json.loads(snippet)
+                except Exception:
+                    data = {}
+            else:
+                data = {}
+
+        if isinstance(data, dict) and "best_id" in data:
+            try:
+                best_id = int(data["best_id"])
+            except Exception:
+                best_id = 0
+
+        return best_id
+
+    def _default_plan(self) -> list[dict]:
+        """
+        Fallback static plan obeying exclusive keyword rules:
+
+          - Step 1: user-only ("user" only)
+          - Step 2: item-only ("item" only)
+          - Step 3: review-only ("review" only)
+          - Step 4: ranking (no user/item/review)
+          - Step 5: ranking (no user/item/review)
+        """
+        return [
+            {"description": "First I need to gather user information"},
+            {"description": "Next, I need to gather item information"},
+            {"description": "Next, I need to gather review information"},
+            {
+                "description": "Next, I need to design a ranking method based on the collected information"
+            },
+            {
+                "description": "Finally, I need to apply the ranking method to produce the final ranked list"
+            },
+        ]
+
+
+# =========================
+#      REASONING MODULE
+# =========================
 
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
-    
+
     def __init__(self, profile_type_prompt, llm, tools):
         """Initialize the reasoning module"""
         super().__init__(profile_type_prompt=profile_type_prompt, memory=None, llm=llm)
         self.tools = tools
-        
-    def __call__(self, user, items, task_description: str, plan: str):
-        """Override the parent class's __call__ method"""
-        # prompt = '''
-        # {task_description}
-        # '''
-        # prompt = prompt.format(task_description=task_description)
-        
-        # messages = [{"role": "user", "content": prompt}]
-        # reasoning_result = self.llm(
-        #     messages=messages,
-        #     temperature=0.1,
-        #     max_tokens=1000
-        # )
 
+    def __call__(self, user, items, task_description: str, plan: list[dict]):
+        """Override the parent class's __call__ method"""
         reasoning_process = {}
         for step in plan:
             print("Sub-task:", step['description'])
             llm_output = self.llm(
                 messages=[
                     {"role": "system", "content": task_description},
-                    {"role": "user", "content": step['description']}],
+                    {"role": "user", "content": step['description']},
+                ],
                 temperature=0.1,
                 max_tokens=1000,
-                response_format={'type': 'json_object'})
+                response_format={'type': 'json_object'},
+            )
             print("LLM Output:", llm_output)
             action = json.loads(llm_output)
             reasoning_process[step['description']] = [action]
@@ -98,10 +414,12 @@ class RecReasoning(ReasoningBase):
                 tool_output = self.tools[tool_name]['function'](**tool_input)
                 print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
                 reasoning_process[step['description']].append(tool_output)
-            
+
         reasoning_result = self.llm(
             messages=[
-                {"role": "system", "content": '''You are a recommendation agent that makes final recommendations based on the reasoning process.
+                {
+                    "role": "system",
+                    "content": '''You are a recommendation agent that makes final recommendations based on the reasoning process.
                   You must always follow this format:
 
                   - You MAY think freely between <reasoning> tags. This will NOT be shown to the user.
@@ -112,8 +430,11 @@ class RecReasoning(ReasoningBase):
                   If your output is not valid JSON EXACTLY matching the format, regenerate it until it is valid.
                   Never output code.
                   Never output natural language.
-                 '''},
-                {"role": "user", "content": f'''Please use the reasoning given here: {reasoning_process} to rank the item IDs from the candidate items: 
+                 ''',
+                },
+                {
+                    "role": "user",
+                    "content": f'''Please use the reasoning given here: {reasoning_process} to rank the item IDs from the candidate items: 
                   {items} 
                   for the user: {user}. 
                   Your job is to 
@@ -134,190 +455,292 @@ class RecReasoning(ReasoningBase):
         
         return reasoning_result
 
+
+# =========================
+#       MEMORY MODULE
+# =========================
+
 class RecMemory(MemoryBase):
     def __init__(self, llm):
         super().__init__(memory_type='recall', llm=llm)
 
     def retriveMemory(self, query_scenario: str):
-        # Extract task name from query scenario
         task_name = query_scenario
-        
-        # Return empty string if memory is empty
+
         if self.scenario_memory._collection.count() == 0:
             return ''
-            
-        # Find most similar memory
+
         similarity_results = self.scenario_memory.similarity_search_with_score(
-            task_name, k=1)
-            
-        # Extract task trajectories from results
+            task_name, k=1
+        )
+
         task_trajectories = [
             result[0].metadata['task_trajectory'] for result in similarity_results
         ]
-        
-        # Join trajectories with newlines and return
+
         return '\n'.join(task_trajectories)
 
-    # def addMemory(self, current_situation: str):
-    #     # Extract task description
-    #     task_name = current_situation
-        
-    #     # Create document with metadata
-    #     memory_doc = Document(
-    #         page_content=task_name,
-    #         metadata={
-    #             "task_name": task_name,
-    #             "task_trajectory": current_situation
-    #         }
-    #     )
-        
-    #     # Add to memory store
-    #     self.scenario_memory.add_documents([memory_doc])
+
+# =========================
+#      RECOMMENDATION AGENT
+# =========================
 
 class RecommendationAgentCS245(RecommendationAgent):
+    # Global feedback shared across agent instances (global refinement)
+    GLOBAL_FEEDBACK: str = ""
+
     def __init__(self, llm: LLMBase):
         super().__init__(llm=llm)
-        self.planning = RecPlanning(llm=self.llm)
+        # each agent instance reads the current global feedback
+        self.global_feedback = RecommendationAgentCS245.GLOBAL_FEEDBACK
+        self.planning = RecPlanning(llm=self.llm, num_candidate_plans=2)
         self.tools = {}
-        self.reasoning = None
+        self.reasoning: RecReasoning | None = None
 
     def set_interaction_tool(self, interaction_tool):
-        super().set_interaction_tool(interaction_tool) # Call base class method
+        super().set_interaction_tool(interaction_tool)
         self.tools = {
-            "get_user": {"function": self.interaction_tool.get_user, "description": "Fetch user data based on user_id", "parameters": {"user_id": "str"}},
-            "get_item": {"function": self.interaction_tool.get_item, "description": "Fetch item data based on item_id", "parameters": {"item_id": "str"}},
-            "get_items": {"function": self.interaction_tool.get_items, "description": "Fetch multiple items based on a list of item_ids", "parameters": {"item_ids": "List[str]"}},
-            "get_reviews": {"function": self.interaction_tool.get_reviews, "description": "Fetch reviews filtered by various parameters", "parameters": {"item_id": "Optional[str]", "user_id": "Optional[str]", "review_id": "Optional[str]"}},
+            "get_user": {
+                "function": self.interaction_tool.get_user,
+                "description": "Fetch user data based on user_id",
+                "parameters": {"user_id": "str"},
+            },
+            "get_item": {
+                "function": self.interaction_tool.get_item,
+                "description": "Fetch item data based on item_id",
+                "parameters": {"item_id": "str"},
+            },
+            "get_items": {
+                "function": self.interaction_tool.get_items,
+                "description": "Fetch multiple items based on a list of item_ids",
+                "parameters": {"item_ids": "List[str]"},
+            },
+            "get_reviews": {
+                "function": self.interaction_tool.get_reviews,
+                "description": "Fetch reviews filtered by various parameters",
+                "parameters": {
+                    "item_id": "Optional[str]",
+                    "user_id": "Optional[str]",
+                    "review_id": "Optional[str]",
+                },
+            },
         }
-        self.reasoning = RecReasoning(profile_type_prompt='', llm=self.llm, tools=self.tools)
+        self.reasoning = RecReasoning(
+            profile_type_prompt='', llm=self.llm, tools=self.tools
+        )
 
     def workflow(self) -> list[dict[str, any]]:
         user_id = self.task['user_id']
         candidate_list = self.task['candidate_list']
 
-        # Retrieve past experience from memory
-        # past_experience = self.memory.retriveMemory(current_situation=f"User {user_id} with candidates {candidate_list}")
+        # --- PLANNING: multi-plan + selection, with global feedback ---
 
-        # Formulate plan
-        plan_task_description = '''
-        Please make a plan to rank a list of candidate items for a given user. You are given information on the user, their historical reviews, and on the candidate items.
-        '''
-        plan = self.planning(task_type='Recommendation Task', task_description=plan_task_description, feedback='', few_shot='')
-        print(plan)
-        # Reasoning and generate final recommendation
+        plan_task_description = f"""
+        Please make a plan to rank a list of candidate items for a given user.
 
+        You will later have access to tools:
+        - get_user(user_id) to fetch user information
+        - get_item(item_id) / get_items(item_ids) to fetch item information
+        - get_reviews(user_id=..., item_id=...) to fetch review information
 
-        plan = [
-         {'description': 'First I need to find the user information'},
-         {'description': 'Next, I need to find item information'},
-         {'description': 'Next, I need to find review information of the candidate items'},
-         {'description': 'Next, I need to find review information of the user'},
-         {'description': 'Next, I need to come up with a method to rank the items based on the information I have gathered'},
-         {'description': 'Finally, I need to use this method to rank the candidate items'}
-        #  {'description': 'Next, I need to retrieve past experience'}
-         ]
+        You are given a user with id: {user_id} and a list of candidate item IDs: {candidate_list}.
+        Your plan should describe:
+          1) how to obtain user information,
+          2) how to obtain candidate item information,
+          3) how to obtain review information (for user and/or items),
+          4) how to design a ranking method based on this information,
+          5) how to apply the ranking method to produce a ranked list.
+        """
+        plan = self.planning(
+            task_type='Recommendation Task',
+            task_description=plan_task_description,
+            feedback=self.global_feedback,
+            few_shot='',
+        )
+        print("Generated plan:", plan)
+
+        # --- INFORMATION GATHERING BASED ON PLAN ---
 
         user = ''
         item_list = []
         history_review = ''
+
         for sub_task in plan:
-            
-            if 'user' in sub_task['description']:
-                user = str(self.interaction_tool.get_user(user_id=self.task['user_id']))
+            desc = sub_task.get('description', '')
+
+            if 'user' in desc.lower():
+                user = str(self.interaction_tool.get_user(user_id=user_id))
                 input_tokens = num_tokens_from_string(user)
                 if input_tokens > 12000:
                     encoding = tiktoken.get_encoding("cl100k_base")
                     user = encoding.decode(encoding.encode(user)[:12000])
 
-            elif 'item' in sub_task['description']:
-                for n_bus in range(len(self.task['candidate_list'])):
-                    item = self.interaction_tool.get_item(item_id=self.task['candidate_list'][n_bus])
-                    keys_to_extract = ['item_id', 'name','stars','review_count','attributes','title', 'average_rating', 'rating_number','description','ratings_count','title_without_series']
-                    filtered_item = {key: item[key] for key in keys_to_extract if key in item}
-                item_list.append(filtered_item)
-                # print(item)
-            elif 'review' in sub_task['description']:
-                history_review = str(self.interaction_tool.get_reviews(user_id=self.task['user_id']))
+            elif 'item' in desc.lower():
+                item_list = []
+                for item_id in candidate_list:
+                    item = self.interaction_tool.get_item(item_id=item_id)
+                    keys_to_extract = [
+                        'item_id',
+                        'name',
+                        'stars',
+                        'review_count',
+                        'attributes',
+                        'title',
+                        'average_rating',
+                        'rating_number',
+                        'description',
+                        'ratings_count',
+                        'title_without_series',
+                    ]
+                    filtered_item = {
+                        key: item[key] for key in keys_to_extract if key in item
+                    }
+                    item_list.append(filtered_item)
+
+            elif 'review' in desc.lower():
+                history_review = str(
+                    self.interaction_tool.get_reviews(user_id=user_id)
+                )
                 input_tokens = num_tokens_from_string(history_review)
                 if input_tokens > 12000:
                     encoding = tiktoken.get_encoding("cl100k_base")
-                    history_review = encoding.decode(encoding.encode(history_review)[:12000])
+                    history_review = encoding.decode(
+                        encoding.encode(history_review)[:12000]
+                    )
             else:
+                # ranking / meta steps, no environment calls here
                 pass
-        task_description = f'''
-        You are a real user on an online platform. Your historical item review text and stars are as follows: {history_review}. 
-        Now you need to rank the following 20 items: {self.task['candidate_list']} according to their match degree to your preference.
-        Please rank the more interested items more front in your rank list.
-        The information of the above 20 candidate items is as follows: {item_list}.
 
-        Your final output should be ONLY a ranked item list of {self.task['candidate_list']} with the following format, DO NOT introduce any other item ids!
+        # --- TASK DESCRIPTION FOR FINAL REASONING / RANKING ---
+
+        task_description = f"""
+        You are a real user on an online platform. Your historical item review text and stars are as follows: {history_review}. 
+        Now you need to rank the following items: {candidate_list} according to their match degree to your preference.
+        Please rank the more interesting items earlier in your ranked list.
+        The information of these candidate items is as follows: {item_list}.
+
+        Your final output should be ONLY a ranked item list of {candidate_list} with the following format, DO NOT introduce any other item ids!
         DO NOT output your analysis process!
 
-        The correct output format:
+The correct output format:
 
         ['item id1', 'item id2', 'item id3', ...]
+        """
 
-        '''
+        reasoning_task_description = f"""
+        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences.
+        You are given the user id: {user_id} and a list of candidate items to rank: {candidate_list}.
 
-        reasoning_task_description = f'''
-        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
-        You can use the tools {self.tools} to gather necessary information about the user and items. If you use a tool, you must specify the tool name and input parameters. The tool name MUST match exactly with one of the tool names provided.
-        Make sure the input parameters are in the correct format as expected by the tool. The information about each tool is included in the tool descriptions and parameter information is included as well.
-        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it. If you need to use a tool, you NEED to specify the tool name under tool_name and input parameters under tool_input, just specifying the tool under action is NOT enough.
-        Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. The format should strictly follow the example below.
+        You can use the tools {self.tools} to gather necessary information about the user and items. 
+        If you use a tool, you must specify the tool name and input parameters. The tool name MUST match exactly with one of the tool names provided.
+        Make sure the input parameters are in the correct format as expected by the tool.
+
+        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it.
+        If you need to use a tool, you NEED to specify the tool name under "tool" and input parameters under "tool_input" — just specifying the tool under "action" is NOT enough.
+
+        Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. 
+        The format should strictly follow the example below:
+
         {{
           "thoughts": "Your reasoning here",
           "action": "string", 
           "tool": "tool_name", 
-          "tool_input": {{input1: "value1", input2: "value2", ...}},
-        }}    
-        '''
-        result = self.reasoning(user=user_id, items=candidate_list, plan=plan, task_description=reasoning_task_description)
-        print("candidate list: ", self.task['candidate_list'])
+          "tool_input": {{ "input1": "value1", "input2": "value2", ... }}
+        }}
+        """
+
+        result = self.reasoning(
+            user=user_id,
+            items=candidate_list,
+            plan=plan,
+            task_description=reasoning_task_description,
+        )
+
+        print("candidate list: ", candidate_list)
         print("result: ", result)
         print("item_list: ", item_list)
         print("history_review: ", history_review)
         print("user: ", user)
+
+        # --- POST-PROCESSING OF LLM OUTPUT ---
+
         try:
-            # print('Meta Output:',result)
             match = re.search(r"\[.*\]", result, re.DOTALL)
             if match:
-                result = match.group()
+                result_list_str = match.group()
             else:
                 print("No list found.")
-            print('Processed Output:',eval(result))
-            # time.sleep(4)
-            return eval(result)
-        except:
+                return ['']
+            print('Processed Output:', eval(result_list_str))
+            return eval(result_list_str)
+        except Exception:
             print('format error')
             return ['']
-        
+
+
+# =========================
+#          MAIN
+# =========================
+
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    
-    task_set = "yelp" # "goodreads" or "yelp"
-    # Initialize Simulator
-    simulator = Simulator(data_dir="processed_datasets", device="auto", cache=True)
 
-    # Load scenarios
-    simulator.set_task_and_groundtruth(task_dir=f"./example/track2/{task_set}/tasks", groundtruth_dir=f"./example/track2/{task_set}/groundtruth")
+    task_set = "yelp"  # "goodreads" or "yelp"
+    num_tasks = 1      # adjust if you want more
 
-    # Set your custom agent
-    simulator.set_agent(RecommendationAgentCS245)
-
-    # Set LLM client
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-    simulator.set_llm(OllamaLLM())
 
-    # Run evaluation
-    # If you don't set the number of tasks, the simulator will run all tasks.
-    agent_outputs = simulator.run_simulation(number_of_tasks=1, enable_threading=True, max_workers=10)
+    # -------- PHASE 1: initial run to gather feedback --------
 
-    # Evaluate the agent
-    evaluation_results = simulator.evaluate()
-    with open(f'./evaluation_results_track2_{task_set}.json', 'w') as f:
-        json.dump(evaluation_results, f, indent=4)
+    simulator1 = Simulator(data_dir="processed_datasets", device="auto", cache=True)
+    simulator1.set_task_and_groundtruth(
+        task_dir=f"./example/track2/{task_set}/tasks",
+        groundtruth_dir=f"./example/track2/{task_set}/groundtruth",
+    )
 
-    print(f"The evaluation_results is :{evaluation_results}")
+    simulator1.set_agent(RecommendationAgentCS245)
+    simulator1.set_llm(OllamaLLM())  # or another LLMBase subclass
+
+    agent_outputs_1 = simulator1.run_simulation(
+        number_of_tasks=num_tasks, enable_threading=True, max_workers=10
+    )
+
+    evaluation_results_1 = simulator1.evaluate()
+    with open(f'./evaluation_results_track2_{task_set}_phase1.json', 'w') as f:
+        json.dump(evaluation_results_1, f, indent=4)
+
+    print(f"[PHASE 1] evaluation_results: {evaluation_results_1}")
+
+    # Build a simple global feedback string for the planner
+    feedback_str = (
+        "Global evaluation feedback from previous run. "
+        "Raw metrics JSON: " + json.dumps(evaluation_results_1)
+        + ". Plans should try to improve hit rates at top ranks "
+          "and better align recommendations with observed user behavior."
+    )
+
+    # Set global feedback so future agent instances can read it
+    RecommendationAgentCS245.GLOBAL_FEEDBACK = feedback_str
+
+    # -------- PHASE 2: refined planning and final evaluation --------
+
+    simulator2 = Simulator(data_dir="processed_datasets", device="auto", cache=True)
+    simulator2.set_task_and_groundtruth(
+        task_dir=f"./example/track2/{task_set}/tasks",
+        groundtruth_dir=f"./example/track2/{task_set}/groundtruth",
+    )
+
+    simulator2.set_agent(RecommendationAgentCS245)
+    simulator2.set_llm(OllamaLLM())
+
+    agent_outputs_2 = simulator2.run_simulation(
+        number_of_tasks=num_tasks, enable_threading=True, max_workers=10
+    )
+
+    evaluation_results_2 = simulator2.evaluate()
+    with open(f'./evaluation_results_track2_{task_set}_phase2.json', 'w') as f:
+        json.dump(evaluation_results_2, f, indent=4)
+
+    print(f"[PHASE 2] evaluation_results: {evaluation_results_2}")
