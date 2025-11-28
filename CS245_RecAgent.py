@@ -67,17 +67,17 @@ class RecReasoning(ReasoningBase):
         
     def __call__(self, user, items, task_description: str, plan: str):
         """Override the parent class's __call__ method"""
-        prompt = '''
-        {task_description}
-        '''
-        prompt = prompt.format(task_description=task_description)
+        # prompt = '''
+        # {task_description}
+        # '''
+        # prompt = prompt.format(task_description=task_description)
         
-        messages = [{"role": "user", "content": prompt}]
-        reasoning_result = self.llm(
-            messages=messages,
-            temperature=0.1,
-            max_tokens=1000
-        )
+        # messages = [{"role": "user", "content": prompt}]
+        # reasoning_result = self.llm(
+        #     messages=messages,
+        #     temperature=0.1,
+        #     max_tokens=1000
+        # )
 
         reasoning_process = {}
         for step in plan:
@@ -110,7 +110,7 @@ class RecReasoning(ReasoningBase):
                   You MUST NOT output code, functions, or explanations in the final response.
                   Only a list.
                  '''},
-                {"role": "user", "content": f"Please use the reasoning given here: {reasoning_process} to calculate a ranking of item IDs from the candidate items: {items} for the user: {user} in the correct format: [item_id1, item_id2, ...]."}],
+                {"role": "user", "content": f"Please use the reasoning given here: {reasoning_process} to calculate a ranking of item IDs from the candidate items: {items} for the user: {user}. Your output should be ONLY a ranked item list of {items} with the following format, DO NOT introduce any other item ids! DO NOT output your analysis process! The correct output format: ['item id1', 'item id2', 'item id3', ...]"}],
                 temperature=0.1,
                 max_tokens=1000)
         
