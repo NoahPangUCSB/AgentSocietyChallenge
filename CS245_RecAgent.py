@@ -14,6 +14,7 @@ import torch
 import os
 
 
+
 def num_tokens_from_string(string: str) -> int:
     encoding = tiktoken.get_encoding("cl100k_base")
     try:
@@ -622,7 +623,7 @@ class RecommendationAgentCS245(RecommendationAgent):
         Your final output should be ONLY a ranked item list of {candidate_list} with the following format, DO NOT introduce any other item ids!
         DO NOT output your analysis process!
 
-        The correct output format:
+The correct output format:
 
         ['item id1', 'item id2', 'item id3', ...]
         """
