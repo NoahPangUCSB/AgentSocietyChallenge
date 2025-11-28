@@ -399,7 +399,7 @@ class RecReasoning(ReasoningBase):
             llm_output = self.llm(
                 messages=[
                     {"role": "system", "content": task_description},
-                    {"role": "user", "content": step['description']},
+                    {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '') + '\n' + 'Your previous reasoning is given here: ' + str(reasoning_process)},
                 ],
                 temperature=0.1,
                 max_tokens=1000,
@@ -426,6 +426,7 @@ class RecReasoning(ReasoningBase):
                   - Your FINAL output must be a strict JSON following the schema: 
                   {{
                     'analysis': '<your internal reasoning here>',
+                    'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short summary>'}}, ...],
                     'ranked_ids': [item_id1, item_id2, ...]
                   }}.
 
