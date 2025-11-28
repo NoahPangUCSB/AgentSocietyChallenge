@@ -399,7 +399,7 @@ class RecReasoning(ReasoningBase):
             llm_output = self.llm(
                 messages=[
                     {"role": "system", "content": task_description},
-                    {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '') + '\n' + 'Your previous reasoning is given here: ' + str(reasoning_process)},
+                    {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '') + '\n' + 'Previous reasoning: ' + json.dumps(reasoning_process, default=str)},
                 ],
                 temperature=0.1,
                 max_tokens=1000,
@@ -414,49 +414,69 @@ class RecReasoning(ReasoningBase):
                 tool_output = self.tools[tool_name]['function'](**tool_input)
                 print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
                 reasoning_process[step['description']].append(tool_output)
+        
+        final_system = {
+            "role": "system",
+            "content": (
+                "You are a recommendation agent. OUTPUT EXACTLY ONE JSON OBJECT and ONLY JSON. "
+                "Do NOT output any text, code, or markdown. Do NOT output Python or code fences. "
+                "The JSON MUST match this schema exactly: "
+                "{ 'analysis': '<string>', 'scores': [{'id': '<string>', 'score': <int>, 'justification': '<short>'}, ...], 'ranked_ids': ['id1','id2',...] }"
+            )
+        }
 
-        reasoning_result = self.llm(
-            messages=[
-                {
-                    "role": "system",
-                    "content": '''You are a recommendation agent that makes final recommendations based on the reasoning process.
-                  You must always follow this format:
+        final_user = {
+            "role": "user",
+            "content": (
+                f"Use this reasoning_process (JSON): {json.dumps(reasoning_process, default=str)}\n"
+                f"Candidate item IDs: {json.dumps(items)}\n"
+                "For each candidate, assign an integer score between 0 and 100 (higher is better) based on how likely the user would highly rate the candidate, give a one-line justification, "
+                "and produce ranked_ids ordered by score descending. Output ONLY the final JSON object, nothing else."
+            )
+        }
+        reasoning_result = self.llm(messages=[final_system, final_user], temperature=0.1, max_tokens=1500)
+        # reasoning_result = self.llm(
+        #     messages=[
+        #         {
+        #             "role": "system",
+        #             "content": '''You are a recommendation agent that makes final recommendations based on the reasoning process.
+        #           You must always follow this format:
 
-                  - You MAY think freely between <reasoning> tags. This will NOT be shown to the user.
-                  - Your FINAL output must be a strict JSON following the schema: 
-                  {{
-                    'analysis': '<your internal reasoning here>',
-                    'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short summary>'}}, ...],
-                    'ranked_ids': [item_id1, item_id2, ...]
-                  }}.
+        #           - You MAY think freely between <reasoning> tags. This will NOT be shown to the user.
+        #           - Your FINAL output must be a strict JSON following the schema: 
+        #           {{
+        #             'analysis': '<your internal reasoning here>',
+        #             'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short summary>'}}, ...],
+        #             'ranked_ids': [item_id1, item_id2, ...]
+        #           }}.
 
-                  You MUST NOT output code, functions, or explanations in the final response.
-                  Only JSON.
-                  If your output is not valid JSON EXACTLY matching the format, regenerate it until it is valid.
-                  Never output code.
-                  Never output natural language.
-                 ''',
-                },
-                {
-                    "role": "user",
-                    "content": f'''Please use the reasoning given here: {reasoning_process} to rank the item IDs from the candidate items: 
-                  {items} 
-                  for the user: {user}. 
-                  Your job is to 
-                  1. Evaluate each candidate in `candidate_list`
-                  2. Think step-by-step internally (in a hidden `analysis` field) about how well each candidate matches the user's preferences based on the reasoning process provided.
-                  3. Produce a final ranked list of candidate IDs in a JSON object by assigning each candidate a numeric relevance score from 0-100 (higher is better) and sorting them accordingly.
+        #           You MUST NOT output code, functions, or explanations in the final response.
+        #           Only JSON.
+        #           If your output is not valid JSON EXACTLY matching the format, regenerate it until it is valid.
+        #           Never output code.
+        #           Never output natural language.
+        #          ''',
+        #         },
+        #         {
+        #             "role": "user",
+        #             "content": f'''Please use the reasoning given here: {reasoning_process} to rank the item IDs from the candidate items: 
+        #           {items} 
+        #           for the user: {user}. 
+        #           Your job is to 
+        #           1. Evaluate each candidate in `candidate_list`
+        #           2. Think step-by-step internally (in a hidden `analysis` field) about how well each candidate matches the user's preferences based on the reasoning process provided.
+        #           3. Produce a final ranked list of candidate IDs in a JSON object by assigning each candidate a numeric relevance score from 0-100 (higher is better) and sorting them accordingly.
 
-                  Your output should be ONLY be strictly valid JSON with a ranked item list of {items} with the following format: 
-                  {{
-                    'analysis': 'your internal reasoning here, do NOT show this to the user',
-                    'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short summary>'}}, ...],
-                    'ranked_ids': ['item id1', 'item id2', 'item id3', ...]
-                  }}
-                  Only output the JSON, do NOT output any other text.
-                  Resulting ranked_ids must be based on the analysis and only include items from the candidate list.'''}],
-                temperature=0.1,
-                max_tokens=1500)
+        #           Your output should be ONLY be strictly valid JSON with a ranked item list of {items} with the following format: 
+        #           {{
+        #             'analysis': 'your internal reasoning here, do NOT show this to the user',
+        #             'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short summary>'}}, ...],
+        #             'ranked_ids': ['item id1', 'item id2', 'item id3', ...]
+        #           }}
+        #           Only output the JSON, do NOT output any other text.
+        #           Resulting ranked_ids must be based on the analysis and only include items from the candidate list.'''}],
+        #         temperature=0.1,
+        #         max_tokens=1500)
         
         return reasoning_result
 
