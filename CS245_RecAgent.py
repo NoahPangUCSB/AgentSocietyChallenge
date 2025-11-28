@@ -452,6 +452,7 @@ class RecReasoning(ReasoningBase):
                   ],
                   'ranked_ids': ['item_123', 'item_456', ...]
                 }}
+                YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
             """
         }
         reasoning_result = self.llm(messages=[final_system, final_user], temperature=0.1, max_tokens=1500)
@@ -688,7 +689,8 @@ class RecommendationAgentCS245(RecommendationAgent):
           "tool": "tool_name", 
           "tool_input": {{input1: "value1", input2: "value2", ...}},
         }}    
-        NO code blocks, NO backticks, NO commentary.
+        NO code blocks, NO backticks, NO commentary. YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
+
         """
 
         result = self.reasoning(
