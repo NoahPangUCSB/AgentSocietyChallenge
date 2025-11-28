@@ -399,7 +399,7 @@ class RecReasoning(ReasoningBase):
             llm_output = self.llm(
                 messages=[
                     {"role": "system", "content": task_description},
-                    {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '') + '\n' + 'Previous reasoning: ' + json.dumps(reasoning_process, default=str)},
+                    {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
                 max_tokens=1000,
