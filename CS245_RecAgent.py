@@ -439,6 +439,7 @@ class RecReasoning(ReasoningBase):
                   Your output should be ONLY be strictly valid JSON with a ranked item list of {items} with the following format: 
                   {{
                     'analysis': 'your internal reasoning here, do NOT show this to the user',
+                    'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short summary>'}}, ...],
                     'ranked_ids': ['item id1', 'item id2', 'item id3', ...]
                   }}
                   Only output the JSON, do NOT output any other text.
