@@ -139,8 +139,8 @@ class GeminiLLM(LLMBase):
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
-        temperature: float = 1.0,
-        max_tokens: int = 4096,
+        temperature: float = 0.1,
+        max_tokens: int = 1000,
         stop_strs: Optional[List[str]] = None,
         n: int = 1,
     ) -> Union[str, List[str]]:
@@ -159,48 +159,69 @@ class GeminiLLM(LLMBase):
             str or list[str]
         """
         try:
-            # Convert OpenAI-style messages to Gemini-compatible prompt
-            # Gemini expects a single prompt string or a "contents" list
             gemini_messages = []
+            system_instruction = None
+
+            # 1. Map OpenAI roles to Gemini roles
             for m in messages:
-                gemini_messages.append({"role": m["role"], "parts": [{"text": m["content"]}]})
+                if m["role"] == "system":
+                    # Extract system prompt to pass separately
+                    system_instruction = m["content"]
+                elif m["role"] == "user":
+                    gemini_messages.append({"role": "user", "parts": [{"text": m["content"]}]})
+                elif m["role"] == "assistant":
+                    gemini_messages.append({"role": "model", "parts": [{"text": m["content"]}]})
 
-            # Create a GenerativeModel for the chosen model
-            model_to_use = model or self.model
-            g_model = genai.GenerativeModel(model_to_use)
+            # 2. Initialize Model with System Instruction (if present)
+            g_model = genai.GenerativeModel(
+                model_name=model,
+                system_instruction=system_instruction
+            )
 
-            # Generate responses
+            # 3. Generate Content
             response = g_model.generate_content(
                 contents=gemini_messages,
                 generation_config={
                     "temperature": temperature,
                     "max_output_tokens": max_tokens,
                     "stop_sequences": stop_strs,
+                    "candidate_count": n,
                 },
-                # n=... is called "candidate_count" in Gemini
-                candidate_count=n,
             )
 
-            # Extract text
+            # 4. Extract Text safely
             outputs = []
-            for candidate in response.candidates:
-                if candidate.content.parts:
-                    outputs.append(candidate.content.parts[0].text)
-                else:
-                    outputs.append("")
+            if response.candidates:
+                for candidate in response.candidates:
+                    # Check if the response was blocked by safety filters
+                    if candidate.finish_reason != 1: # 1 = STOP (Success)
+                        # Handle safety block or other finish reasons
+                        outputs.append(f"[Blocked: {candidate.finish_reason.name}]")
+                        continue
+                    
+                    if candidate.content.parts:
+                        outputs.append(candidate.content.parts[0].text)
+                    else:
+                        outputs.append("")
+            else:
+                # Fallback if no candidates returned (rare, usually strict safety filters)
+                outputs.append("")
 
-            if n == 1:
+            if n == 1 and outputs:
                 return outputs[0]
             return outputs
 
         except Exception as e:
             msg = str(e)
             if "429" in msg:
-                logger.warning(f"Gemini Rate Limit Error: {msg}")
+                # logger.warning(f"Gemini Rate Limit Error: {msg}")
+                pass
             elif "quota" in msg.lower():
-                logger.error("Gemini Quota Exceeded. Check your Google Cloud billing.")
+                # logger.error("Gemini Quota Exceeded.")
+                pass
             else:
-                logger.error(f"Gemini LLM Error: {msg}")
+                # logger.error(f"Gemini LLM Error: {msg}")
+                pass
             raise e
 
     def get_embedding_model(self):
