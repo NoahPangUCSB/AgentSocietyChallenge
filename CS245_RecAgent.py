@@ -116,6 +116,8 @@ class RecPlanning(PlanningBase):
         """
         Build the planning prompt with STRICT, EXCLUSIVE keyword constraints.
         """
+        print("Building planning prompt for candidate index:", candidate_index)
+        
         base_instructions = """
 You are a planner who divides a {task_type} into several clear sub-tasks.
 Each sub-task should describe a concrete action the agent should take.
