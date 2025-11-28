@@ -417,22 +417,33 @@ class RecReasoning(ReasoningBase):
         
         final_system = {
             "role": "system",
-            "content": (
-                "You are a recommendation agent. OUTPUT EXACTLY ONE JSON OBJECT and ONLY JSON. "
-                "Do NOT output any text, code, or markdown. Do NOT output Python or code fences. "
-                "The JSON MUST match this schema exactly: "
-                "{ 'analysis': '<string>', 'scores': [{'id': '<string>', 'score': <int>, 'justification': '<short>'}, ...], 'ranked_ids': ['id1','id2',...] }"
-            )
+            "content": """
+                You are a recommendation agent. OUTPUT EXACTLY ONE JSON OBJECT and ONLY JSON.
+                Do NOT output any text, code, or markdown. Do NOT output Python or code fences. 
+                The JSON MUST match this schema exactly: 
+                {{ 'analysis': '<string>', 'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short>'}}, ...], 'ranked_ids': ['id1','id2',...] }}
+            """
         }
 
         final_user = {
             "role": "user",
-            "content": (
-                f"Use this reasoning_process (JSON): {json.dumps(reasoning_process, default=str)}\n"
-                f"Candidate item IDs: {json.dumps(items)}\n"
-                "For each candidate, assign an integer score between 0 and 100 (higher is better) based on how likely the user would highly rate the candidate, give a one-line justification, "
-                "and produce ranked_ids ordered by score descending. Output ONLY the final JSON object, nothing else."
-            )
+            "content": f"""
+                Use this reasoning_process (JSON): {json.dumps(reasoning_process, default=str)}
+                Candidate item IDs: {json.dumps(items)}
+                For each candidate, assign an integer score between 0 and 100 (higher is better) based on how likely the user would highly rate the candidate, give a one-line justification,
+                and produce ranked_ids ordered by score descending. Output ONLY the final JSON object:
+                {{ 'analysis': '<string>', 'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short>'}}, ...], 'ranked_ids': ['id1','id2',...] }}
+                NOTHING else. For instance:
+                {{
+                  'analysis': 'Based on the user preferences and item features, I evaluated each candidate as follows...',
+                  'scores': [
+                    {{'id': 'item_123', 'score': 95, 'justification': 'Highly matches user preferences for fine dining'}},
+                    {{'id': 'item_456', 'score': 80, 'justification': 'Good match but lacks some features such as outdoor seating'}},
+                    ...
+                  ],
+                  'ranked_ids': ['item_123', 'item_456', ...]
+                }}
+            """
         }
         reasoning_result = self.llm(messages=[final_system, final_user], temperature=0.1, max_tokens=1500)
         # reasoning_result = self.llm(
@@ -647,7 +658,7 @@ class RecommendationAgentCS245(RecommendationAgent):
         Your final output should be ONLY a ranked item list of {candidate_list} with the following format, DO NOT introduce any other item ids!
         DO NOT output your analysis process!
 
-The correct output format:
+        The correct output format:
 
         ['item id1', 'item id2', 'item id3', ...]
         """
@@ -660,15 +671,15 @@ The correct output format:
         The information about each tool is included in the tool descriptions and parameter information is included as well.
 
         You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it. For example, if the sub-task is to gather user information, you should create an action that uses the get_user tool with the appropriate user_id.
-        As another example, if the sub-task is to create a ranking method, you should think about how to rank the items based on the information you have gathered so far.
         
-        The format should strictly follow the example below.
+        OUTPUT FORMAT:
         {{
           "thoughts": "Your reasoning here",
           "action": "string", 
           "tool": "tool_name", 
           "tool_input": {{input1: "value1", input2: "value2", ...}},
         }}    
+        NO code blocks, NO backticks, NO commentary.
         """
 
         result = self.reasoning(
