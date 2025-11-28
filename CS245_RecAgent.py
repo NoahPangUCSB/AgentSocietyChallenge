@@ -184,8 +184,10 @@ class RecommendationAgentCS245(RecommendationAgent):
         plan = [
          {'description': 'First I need to find the user information'},
          {'description': 'Next, I need to find item information'},
-         {'description': 'Next, I need to find review information'},
-         {'description': 'Finally, I need to come up with a method to rank the items based on the information I have gathered'}
+         {'description': 'Next, I need to find review information of the candidate items'},
+         {'description': 'Next, I need to find review information of the user'},
+         {'description': 'Next, I need to come up with a method to rank the items based on the information I have gathered'},
+         {'description': 'Finally, I need to use this method to rank the candidate items'}
         #  {'description': 'Next, I need to retrieve past experience'}
          ]
 
