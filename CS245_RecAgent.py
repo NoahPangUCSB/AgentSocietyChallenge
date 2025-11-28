@@ -118,9 +118,8 @@ class RecReasoning(ReasoningBase):
                   for the user: {user}. 
                   Your job is to 
                   1. Evaluate each candidate in `candidate_list`
-                  2. Think step-by-step internally (in a hidden `analysis` field)
-                  3. Produce a final ranked list of candidate IDs in a JSON object by assigning each candidate a numeric relevance score from 0-100 (higher is better) based on
-                  how likely the user would be to highly rate a candidate item and sorting them accordingly.
+                  2. Think step-by-step internally (in a hidden `analysis` field) about how well each candidate matches the user's preferences based on the reasoning process provided.
+                  3. Produce a final ranked list of candidate IDs in a JSON object by assigning each candidate a numeric relevance score from 0-100 (higher is better) and sorting them accordingly.
 
                   Your output should be ONLY be strictly valid JSON with a ranked item list of {items} with the following format: 
                   {{
