@@ -100,6 +100,7 @@ class RecPlanning(PlanningBase):
             feedback=feedback,
         )
         best_idx = max(0, min(best_idx, len(candidate_plans) - 1))
+        print("Selected plan index:", best_idx)
         return candidate_plans[best_idx]["steps"]
 
     # ---- Prompt construction ----
@@ -228,7 +229,7 @@ You may find the following example(s) helpful:
         """
         text = llm_output.strip()
         data = None
-
+        print("Parsing plan from LLM output:", text)
         try:
             data = json.loads(text)
         except Exception:
@@ -275,6 +276,7 @@ You may find the following example(s) helpful:
         Ask the LLM to pick the best plan among candidate_plans.
         Returns an integer index into candidate_plans.
         """
+        print("Selecting best plan among", len(candidate_plans), "candidates...")
         # Compact representation for the critic
         critic_input = []
         for i, plan in enumerate(candidate_plans):
