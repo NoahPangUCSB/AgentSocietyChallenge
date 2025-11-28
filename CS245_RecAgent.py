@@ -52,7 +52,7 @@ class RecPlanning(PlanningBase):
         Returns a single chosen plan as a list of steps (dicts with 'description').
         """
         candidate_plans = []
-
+        print("Generating candidate plans...")
         for i in range(self.num_candidate_plans):
             prompt = self._build_planning_prompt(
                 task_type=task_type,
