@@ -423,7 +423,11 @@ class RecReasoning(ReasoningBase):
                   You must always follow this format:
 
                   - You MAY think freely between <reasoning> tags. This will NOT be shown to the user.
-                  - Your FINAL output must be a strict JSON following the schema: {'ranked_ids': [item_id1, item_id2, ...]}.
+                  - Your FINAL output must be a strict JSON following the schema: 
+                  {{
+                    'analysis': '<your internal reasoning here>',
+                    'ranked_ids': [item_id1, item_id2, ...]
+                  }}.
 
                   You MUST NOT output code, functions, or explanations in the final response.
                   Only JSON.
@@ -449,7 +453,7 @@ class RecReasoning(ReasoningBase):
                     'ranked_ids': ['item id1', 'item id2', 'item id3', ...]
                   }}
                   Only output the JSON, do NOT output any other text.
-                  Analysis should be your chain of thought. Resulting ranked_ids must be based on the analysis and only include items from the candidate list.'''}],
+                  Resulting ranked_ids must be based on the analysis and only include items from the candidate list.'''}],
                 temperature=0.1,
                 max_tokens=1500)
         
@@ -628,25 +632,22 @@ The correct output format:
         """
 
         reasoning_task_description = f"""
-        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences.
-        You are given the user id: {user_id} and a list of candidate items to rank: {candidate_list}.
+        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
+        
+        You can use the tools {self.tools} to gather necessary information about the user and items. If you use a tool, you MUST specify the tool name under "tool" and input parameters under "tool_input", just specifying the tool under action is NOT enough. 
+        The tool name MUST match exactly with one of the tool names provided. Make sure the input parameters are in the correct format as expected by the tool. 
+        The information about each tool is included in the tool descriptions and parameter information is included as well.
 
-        You can use the tools {self.tools} to gather necessary information about the user and items. 
-        If you use a tool, you must specify the tool name and input parameters. The tool name MUST match exactly with one of the tool names provided.
-        Make sure the input parameters are in the correct format as expected by the tool.
-
-        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it.
-        If you need to use a tool, you NEED to specify the tool name under "tool" and input parameters under "tool_input" — just specifying the tool under "action" is NOT enough.
-
-        Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. 
-        The format should strictly follow the example below:
-
+        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it. For example, if the sub-task is to gather user information, you should create an action that uses the get_user tool with the appropriate user_id.
+        As another example, if the sub-task is to create a ranking method, you should think about how to rank the items based on the information you have gathered so far.
+        
+        The format should strictly follow the example below.
         {{
           "thoughts": "Your reasoning here",
           "action": "string", 
           "tool": "tool_name", 
-          "tool_input": {{ "input1": "value1", "input2": "value2", ... }}
-        }}
+          "tool_input": {{input1: "value1", input2: "value2", ...}},
+        }}    
         """
 
         result = self.reasoning(
