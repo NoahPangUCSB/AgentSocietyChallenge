@@ -113,7 +113,7 @@ class RecReasoning(ReasoningBase):
                   Never output code.
                   Never output natural language.
                  '''},
-                {"role": "user", "content": f"Please use the reasoning given here: {reasoning_process} to calculate a ranking of item IDs from the candidate items: {items} for the user: {user}. Your output should be ONLY a ranked item list of {items} with the following format: ['item id1', 'item id2', 'item id3', ...]. DO NOT introduce any other item ids! DO NOT output your analysis process!"}],
+                {"role": "user", "content": f"Please use the reasoning given here: {reasoning_process} to rank the item IDs from the candidate items: {items} for the user: {user}. Your output should be ONLY a ranked item list of {items} with the following format: ['item id1', 'item id2', 'item id3', ...]. DO NOT introduce any other item ids! DO NOT output your analysis process!"}],
                 temperature=0.1,
                 max_tokens=1000)
         
