@@ -117,107 +117,108 @@ class RecPlanning(PlanningBase):
         Build the planning prompt with STRICT, EXCLUSIVE keyword constraints.
         """
         print("Building planning prompt for candidate index:", candidate_index)
-        
+
         base_instructions = """
-You are a planner who divides a {task_type} into several clear sub-tasks.
-Each sub-task should describe a concrete action the agent should take.
+        You are a planner who divides a {task_type} into several clear sub-tasks.
+        Each sub-task should describe a concrete action the agent should take.
 
-You are generating CANDIDATE PLAN #{candidate_index}.
+        You are generating CANDIDATE PLAN #{candidate_index}.
 
-DOWNSTREAM MODULES WILL PARSE THE STEP DESCRIPTIONS USING SIMPLE KEYWORD RULES.
-So you MUST follow these STRICT and EXCLUSIVE constraints:
+        DOWNSTREAM MODULES WILL PARSE THE STEP DESCRIPTIONS USING SIMPLE KEYWORD RULES.
+        So you MUST follow these STRICT and EXCLUSIVE constraints:
 
-  1. Steps about USER information:
-     - The description MUST contain the word "user".
-     - The description MUST NOT contain the words "item" or "review".
-     - Example (valid): "First I need to gather user information"
-     - Example (invalid): "I need to get user and item data"
+          1. Steps about USER information:
+            - The description MUST contain the word "user".
+            - The description MUST NOT contain the words "item" or "review".
+            - Example (valid): "First I need to gather user information"
+            - Example (invalid): "I need to get user and item data"
 
-  2. Steps about ITEM information:
-     - The description MUST contain the word "item".
-     - The description MUST NOT contain the words "user" or "review".
-     - Example (valid): "Next, I need to gather item information"
-     - Example (invalid): "I need to inspect user-item interactions"
+          2. Steps about ITEM information:
+            - The description MUST contain the word "item".
+            - The description MUST NOT contain the words "user" or "review".
+            - Example (valid): "Next, I need to gather item information"
+            - Example (invalid): "I need to inspect user-item interactions"
 
-  3. Steps about REVIEW information:
-     - The description MUST contain the word "review".
-     - The description MUST NOT contain the words "user" or "item".
-     - Example (valid): "Next, I need to gather review information"
-     - Example (invalid): "I need to check user review history"
+          3. Steps about REVIEW information:
+            - The description MUST contain the word "review".
+            - The description MUST NOT contain the words "user" or "item".
+            - Example (valid): "Next, I need to gather review information"
+            - Example (invalid): "I need to check user review history"
 
-  4. Steps about designing or applying a ranking method:
-     - The description MUST NOT contain the words "user", "item", or "review".
-     - Example (valid): "Next, I need to design a ranking method based on the collected information"
-     - Example (valid): "Finally, I need to apply the ranking method to produce the final ranked list"
+          4. Steps about designing or applying a ranking method:
+            - The description MUST NOT contain the words "user", "item", or "review".
+            - Example (valid): "Next, I need to design a ranking method based on the collected information"
+            - Example (valid): "Finally, I need to apply the ranking method to produce the final ranked list"
 
-  5. The plan should have between 4 and 6 sub-tasks, and MUST include:
-     - At least one USER-only step (rule 1)
-     - At least one ITEM-only step (rule 2)
-     - At least one REVIEW-only step (rule 3)
-     - At least one ranking-related step (rule 4)
+          5. The plan should have between 4 and 6 sub-tasks, and MUST include:
+            - At least one USER-only step (rule 1)
+            - At least one ITEM-only step (rule 2)
+            - At least one REVIEW-only step (rule 3)
+            - At least one ranking-related step (rule 4)
 
-The plan is for a recommendation scenario where the agent will:
-  1) gather user information,
-  2) gather candidate item information,
-  3) gather review information,
-  4) design a ranking method,
-  5) apply the ranking method.
+        The plan is for a recommendation scenario where the agent will:
+          1) gather user information,
+          2) gather candidate item information,
+          3) gather review information,
+          4) design a ranking method,
+          5) apply the ranking method.
 
-Your output MUST be valid JSON with the following structure:
+        Your output MUST be valid JSON with the following structure:
 
-{
-  "rationale": "short natural language rationale",
-  "steps": [
-    {
-      "description": "First I need to gather user information",
-      "reasoning_instruction": "optional reasoning guidance for this step"
-    },
-    {
-      "description": "Next, I need to gather item information",
-      "reasoning_instruction": "..."
-    },
-    {
-      "description": "Next, I need to gather review information",
-      "reasoning_instruction": "..."
-    },
-    {
-      "description": "Next, I need to design a ranking method based on the collected information",
-      "reasoning_instruction": "..."
-    },
-    {
-      "description": "Finally, I need to apply the ranking method to produce the final ranked list",
-      "reasoning_instruction": "..."
-    }
-  ]
-}
+        {
+          "rationale": "short natural language rationale",
+          "steps": [
+            {
+              "description": "First I need to gather user information",
+              "reasoning_instruction": "optional reasoning guidance for this step"
+            },
+            {
+              "description": "Next, I need to gather item information",
+              "reasoning_instruction": "..."
+            },
+            {
+              "description": "Next, I need to gather review information",
+              "reasoning_instruction": "..."
+            },
+            {
+              "description": "Next, I need to design a ranking method based on the collected information",
+              "reasoning_instruction": "..."
+            },
+            {
+              "description": "Finally, I need to apply the ranking method to produce the final ranked list",
+              "reasoning_instruction": "..."
+            }
+          ]
+        }
 
-Only output JSON. Do NOT include any extra text outside the JSON.
-""".format(task_type=task_type, candidate_index=candidate_index + 1)
+        Only output JSON. Do NOT include any extra text outside the JSON.
+        """.format(task_type=task_type, candidate_index=candidate_index + 1)
 
+        print("Base instructions prepared.")
         if feedback:
             prompt = f"""{base_instructions}
 
-Here is feedback from previous attempts at similar tasks (Reflexion):
-\"\"\"{feedback}\"\"\" 
+            Here is feedback from previous attempts at similar tasks (Reflexion):
+            \"\"\"{feedback}\"\"\" 
 
-Use this feedback to improve this candidate plan.
+            Use this feedback to improve this candidate plan.
 
-Current task description:
-\"\"\"{task_description}\"\"\" 
-"""
+            Current task description:
+            \"\"\"{task_description}\"\"\" 
+            """
         else:
             prompt = f"""{base_instructions}
 
-Current task description:
-\"\"\"{task_description}\"\"\" 
-"""
-
+            Current task description:
+            \"\"\"{task_description}\"\"\" 
+            """
+        print("Prompt with feedback prepared.")
         if few_shot:
             prompt += f"""
 
-You may find the following example(s) helpful:
-{few_shot}
-"""
+            You may find the following example(s) helpful:
+            {few_shot}
+            """
 
         return prompt
 
