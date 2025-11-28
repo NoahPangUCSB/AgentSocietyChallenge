@@ -3,6 +3,7 @@ from openai import OpenAI
 from langchain_openai import OpenAIEmbeddings
 from .infinigence_embeddings import InfinigenceEmbeddings
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import google.generativeai as genai
 import logging
 logger = logging.getLogger("websocietysimulator")
 
@@ -105,6 +106,110 @@ class OllamaLLM(LLMBase):
             raise e
     
     def get_embedding_model(self):
+        return self.embedding_model
+
+class GeminiLLM(LLMBase):
+    """
+    Wrapper for Google Gemini models that mirrors the interface of DeepseekLLM.
+    """
+
+    def __init__(self, api_key: str, model: str = "gemini-1.5-pro"):
+        """
+        Initialize Gemini LLM
+        
+        Args:
+            api_key: Google API key (https://aistudio.google.com/app/apikey)
+            model: Default Gemini model ("gemini-1.5-pro" recommended)
+        """
+        super().__init__(model)
+
+        genai.configure(api_key=api_key)
+        self.client = genai.GenerativeModel(model)
+        
+        # Gemini *does* support embeddings, but with a different API.
+        # For consistency with your Deepseek wrapper, treat embeddings as optional.
+        self.embedding_model = None
+
+    @retry(
+        retry=retry_if_exception_type(Exception),
+        wait=wait_exponential(multiplier=1, min=10, max=300),
+        stop=stop_after_attempt(10)
+    )
+    def __call__(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: float = 1.0,
+        max_tokens: int = 4096,
+        stop_strs: Optional[List[str]] = None,
+        n: int = 1,
+    ) -> Union[str, List[str]]:
+        """
+        Call Gemini API using the same interface as DeepSeekLLM.
+
+        Args:
+            messages: [{"role": "...", "content": "..."}]
+            model: Optional override of the Gemini model
+            temperature: Sampling temperature
+            max_tokens: Max output tokens
+            stop_strs: Optional stop strings
+            n: Number of completions to generate
+
+        Returns:
+            str or list[str]
+        """
+        try:
+            # Convert OpenAI-style messages to Gemini-compatible prompt
+            # Gemini expects a single prompt string or a "contents" list
+            gemini_messages = []
+            for m in messages:
+                gemini_messages.append({"role": m["role"], "parts": [{"text": m["content"]}]})
+
+            # Create a GenerativeModel for the chosen model
+            model_to_use = model or self.model
+            g_model = genai.GenerativeModel(model_to_use)
+
+            # Generate responses
+            response = g_model.generate_content(
+                contents=gemini_messages,
+                generation_config={
+                    "temperature": temperature,
+                    "max_output_tokens": max_tokens,
+                    "stop_sequences": stop_strs,
+                },
+                # n=... is called "candidate_count" in Gemini
+                candidate_count=n,
+            )
+
+            # Extract text
+            outputs = []
+            for candidate in response.candidates:
+                if candidate.content.parts:
+                    outputs.append(candidate.content.parts[0].text)
+                else:
+                    outputs.append("")
+
+            if n == 1:
+                return outputs[0]
+            return outputs
+
+        except Exception as e:
+            msg = str(e)
+            if "429" in msg:
+                logger.warning(f"Gemini Rate Limit Error: {msg}")
+            elif "quota" in msg.lower():
+                logger.error("Gemini Quota Exceeded. Check your Google Cloud billing.")
+            else:
+                logger.error(f"Gemini LLM Error: {msg}")
+            raise e
+
+    def get_embedding_model(self):
+        """
+        Gemini technically supports embeddings (via genai.embed_text),
+        but to match the DeepseekLLM interface we return None unless you want it.
+        """
+        if self.embedding_model is None:
+            logger.warning("Gemini embedding model not set. Returning None.")
         return self.embedding_model
 class DeepseekLLM(LLMBase):
     def __init__(self, api_key: str, model: str = "deepseek-chat"):

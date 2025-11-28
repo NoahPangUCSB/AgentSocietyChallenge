@@ -2,7 +2,7 @@ import json
 from websocietysimulator import Simulator
 from websocietysimulator.agent import RecommendationAgent
 import tiktoken
-from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, DeepseekLLM, OllamaLLM
+from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, DeepseekLLM, OllamaLLM, GeminiLLM
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 from websocietysimulator.agent.modules.memory_modules import MemoryBase
@@ -713,6 +713,7 @@ if __name__ == "__main__":
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
     # -------- PHASE 1: initial run to gather feedback --------
 
@@ -723,7 +724,7 @@ if __name__ == "__main__":
     )
 
     simulator1.set_agent(RecommendationAgentCS245)
-    simulator1.set_llm(OllamaLLM())  # or another LLMBase subclass
+    simulator1.set_llm(GeminiLLM())  # or another LLMBase subclass
 
     agent_outputs_1 = simulator1.run_simulation(
         number_of_tasks=num_tasks, enable_threading=True, max_workers=10
@@ -755,7 +756,7 @@ if __name__ == "__main__":
     )
 
     simulator2.set_agent(RecommendationAgentCS245)
-    simulator2.set_llm(OllamaLLM())
+    simulator2.set_llm(GeminiLLM())
 
     agent_outputs_2 = simulator2.run_simulation(
         number_of_tasks=num_tasks, enable_threading=True, max_workers=10
