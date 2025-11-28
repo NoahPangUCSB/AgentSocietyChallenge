@@ -114,11 +114,20 @@ class RecReasoning(ReasoningBase):
                   Never output natural language.
                  '''},
                 {"role": "user", "content": f'''Please use the reasoning given here: {reasoning_process} to rank the item IDs from the candidate items: 
-                 {items} 
-                 for the user: {user}. 
-                 Your output should be ONLY be strictly valid JSON with a ranked item list of {items} with the following format: 
-                 {{'ranked_ids': ['item id1', 'item id2', 'item id3', ...]}}. 
-                  Only output the JSON, do NOT output any other text.'''}],
+                  {items} 
+                  for the user: {user}. 
+                  Your job is to 
+                  1. Evaluate each candidate in `candidate_list`
+                  2. Think step-by-step internally (in a hidden `analysis` field)
+                  3. Produce a final ranked list of candidate IDs in a JSON object
+
+                  Your output should be ONLY be strictly valid JSON with a ranked item list of {items} with the following format: 
+                  {{
+                    'analysis': 'your internal reasoning here, do NOT show this to the user',
+                    'ranked_ids': ['item id1', 'item id2', 'item id3', ...]
+                  }}
+                  Only output the JSON, do NOT output any other text.
+                  Analysis should be your chain of thought. Resulting ranked_ids must be based on the analysis and only include items from the candidate list.'''}],
                 temperature=0.1,
                 max_tokens=1000)
         
