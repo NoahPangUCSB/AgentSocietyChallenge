@@ -101,7 +101,15 @@ class RecReasoning(ReasoningBase):
             
         reasoning_result = self.llm(
             messages=[
-                {"role": "system", "content": "You are a recommendation agent that makes final recommendations based on the reasoning process, and must give output in the required format: [item_id1, item_id2, ...]. Do NOT include any additional text."},
+                {"role": "system", "content": '''You are a recommendation agent that makes final recommendations based on the reasoning process, and must give output in the required format: [item_id1, item_id2, ...].
+                  You must always follow this format:
+
+                  - You MAY think freely between <reasoning> tags. This will NOT be shown to the user.
+                  - Your FINAL output must be a strict list following the schema provided in the final instruction.
+
+                  You MUST NOT output code, functions, or explanations in the final response.
+                  Only a list.
+                 '''},
                 {"role": "user", "content": f"Please use the reasoning given here: {reasoning_process} to calculate a ranking of item IDs from the candidate items: {items} for the user: {user} in the correct format: [item_id1, item_id2, ...]."}],
                 temperature=0.1,
                 max_tokens=1000)
