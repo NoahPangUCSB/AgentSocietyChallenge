@@ -298,7 +298,7 @@ if __name__ == "__main__":
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.
-    agent_outputs = simulator.run_simulation(number_of_tasks=2, enable_threading=True, max_workers=10)
+    agent_outputs = simulator.run_simulation(number_of_tasks=1, enable_threading=True, max_workers=10)
 
     # Evaluate the agent
     evaluation_results = simulator.evaluate()
