@@ -425,42 +425,6 @@ class RecReasoning(ReasoningBase):
                 print("Final answer reached.", reasoning_result)
                 break
         
-        # final_system = {
-        #     "role": "system",
-        #     "content": """
-        #         You are a recommendation agent. OUTPUT EXACTLY ONE JSON OBJECT and ONLY JSON.
-        #         Do NOT output any text, code, or markdown. Do NOT output Python or code fences. 
-        #         The JSON MUST match this schema exactly: 
-        #         {{ 'analysis': '<string>', 'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short>'}}, ...], 'ranked_ids': ['id1','id2',...] }}
-        #     """
-        # }
-
-        # final_assistant = {"role": "assistant", "content": str(reasoning_process)}
-
-        # final_user = {
-        #     "role": "user",
-        #     "content": f"""
-        #         Use your previous reasoning process to rank the candidate items for the user.
-        #         Candidate item IDs: {json.dumps(items)}
-        #         For each candidate, assign an integer score between 0 and 100 (higher is better) based on how likely the user would highly rate the candidate, give a one-line justification,
-        #         and produce ranked_ids ordered by score descending. Output ONLY the final JSON object:
-        #         {{ 'analysis': '<string>', 'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short>'}}, ...], 'ranked_ids': ['id1','id2',...] }}
-        #         NOTHING else. For instance:
-        #         {{
-        #           'analysis': 'Based on the user preferences and item features, I evaluated each candidate as follows...',
-        #           'scores': [
-        #             {{'id': 'item_123', 'score': 95, 'justification': 'Highly matches user preferences for fine dining'}},
-        #             {{'id': 'item_456', 'score': 80, 'justification': 'Good match but lacks some features such as outdoor seating'}},
-        #             ...
-        #           ],
-        #           'ranked_ids': ['item_123', 'item_456', ...]
-        #         }}
-        #         YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
-        #         If you deviate from the format even slightly, I will terminate the run. Output ONLY the format.”
-        #     """
-        # }
-        # reasoning_result = self.llm(messages=[final_assistant, final_system, final_user], temperature=0.1, max_tokens=24576)
-        # print("Final reasoning result:", reasoning_result)
         return reasoning_result
 
 
@@ -732,21 +696,21 @@ if __name__ == "__main__":
 
     # -------- PHASE 2: refined planning and final evaluation --------
 
-    # simulator2 = Simulator(data_dir="processed_datasets", device="auto", cache=True)
-    # simulator2.set_task_and_groundtruth(
-    #     task_dir=f"./example/track2/{task_set}/tasks",
-    #     groundtruth_dir=f"./example/track2/{task_set}/groundtruth",
-    # )
+    simulator2 = Simulator(data_dir="processed_datasets", device="auto", cache=True)
+    simulator2.set_task_and_groundtruth(
+        task_dir=f"./example/track2/{task_set}/tasks",
+        groundtruth_dir=f"./example/track2/{task_set}/groundtruth",
+    )
 
-    # simulator2.set_agent(RecommendationAgentCS245)
-    # simulator2.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
+    simulator2.set_agent(RecommendationAgentCS245)
+    simulator2.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
 
-    # agent_outputs_2 = simulator2.run_simulation(
-    #     number_of_tasks=num_tasks, enable_threading=True, max_workers=10
-    # )
+    agent_outputs_2 = simulator2.run_simulation(
+        number_of_tasks=num_tasks, enable_threading=True, max_workers=10
+    )
 
-    # evaluation_results_2 = simulator2.evaluate()
-    # with open(f'./evaluation_results_track2_{task_set}_phase2.json', 'w') as f:
-    #     json.dump(evaluation_results_2, f, indent=4)
+    evaluation_results_2 = simulator2.evaluate()
+    with open(f'./evaluation_results_track2_{task_set}_phase2.json', 'w') as f:
+        json.dump(evaluation_results_2, f, indent=4)
 
-    # print(f"[PHASE 2] evaluation_results: {evaluation_results_2}")
+    print(f"[PHASE 2] evaluation_results: {evaluation_results_2}")
