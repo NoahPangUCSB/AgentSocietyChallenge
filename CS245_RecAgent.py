@@ -417,7 +417,7 @@ class RecReasoning(ReasoningBase):
                 print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
                 reasoning_process[step['description']].append(tool_output)
             elif 'action' in action and action['action'] == 'FINISH':
-                reasoning_result = action.get('ranked_ids', '[]')
+                reasoning_result = str(action.get('ranked_ids', '[]'))
                 print("Final answer reached.", reasoning_result)
                 break
         
