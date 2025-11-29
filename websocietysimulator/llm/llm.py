@@ -142,6 +142,7 @@ class GeminiLLM(LLMBase):
             n=n
         )
 
+        print("Gemini Response:", response)
         if n == 1:
             return response.choices[0].message.content
 
