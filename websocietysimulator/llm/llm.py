@@ -132,7 +132,7 @@ class GeminiLLM(LLMBase):
         stop_strs: Optional[List[str]] = None,
         n: int = 1
     ) -> Union[str, List[str]]:
-
+        print("Gemini Messages:", messages)
         response = self.client.chat.completions.create(
             model=model or self.model,
             messages=messages,
