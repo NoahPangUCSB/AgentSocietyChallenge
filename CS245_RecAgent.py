@@ -626,7 +626,7 @@ class RecommendationAgentCS245(RecommendationAgent):
         The information about each tool is included in the tool descriptions and parameter information is included as well.
 
         You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it. For example, if the sub-task is to gather user information, you should create an action that uses the get_user tool with the appropriate user_id.
-        You should also include your thoughts and reasoning for each action you take. You must include all the candidate ids in your final ranked list.
+        You should also include your thoughts and reasoning for each action you take. You're reasoning should be relatively concise. You must include all the candidate ids in your final ranked list.
         
         OUTPUT FORMAT:
         {{
