@@ -398,7 +398,6 @@ class RecReasoning(ReasoningBase):
             print("Sub-task:", step['description'])
             llm_output = self.llm(
                 messages=[
-                    {"role": "assistant", "content": str(reasoning_process)},
                     {"role": "system", "content": task_description},
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
@@ -438,7 +437,7 @@ class RecReasoning(ReasoningBase):
         final_user = {
             "role": "user",
             "content": f"""
-                Use this reasoning_process (JSON): {json.dumps(reasoning_process, default=str)}
+                Use your previous reasoning process to rank the candidate items for the user.
                 Candidate item IDs: {json.dumps(items)}
                 For each candidate, assign an integer score between 0 and 100 (higher is better) based on how likely the user would highly rate the candidate, give a one-line justification,
                 and produce ranked_ids ordered by score descending. Output ONLY the final JSON object:
