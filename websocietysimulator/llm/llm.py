@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Union
 from openai import OpenAI
 from langchain_openai import OpenAIEmbeddings
+from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
 from .infinigence_embeddings import InfinigenceEmbeddings
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import logging
@@ -121,7 +122,12 @@ class GeminiLLM(LLMBase):
         )
 
         self.embedding_model_name = "models/embedding-001"
-
+    
+    @retry(
+        retry=retry_if_exception_type(Exception), # Or catch specific 429 errors if possible
+        wait=wait_random_exponential(multiplier=1, max=60), # Wait 2s, then 4s, then 8s...
+        stop=stop_after_attempt(10)
+    )
     def __call__(
         self,
         messages: List[Dict[str, str]],
