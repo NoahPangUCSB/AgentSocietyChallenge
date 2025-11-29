@@ -1,10 +1,10 @@
 import json
-from websocietysimulator import Simulator
-from websocietysimulator.agent import RecommendationAgent
+from ..websocietysimulator import Simulator
+from ..websocietysimulator.agent import RecommendationAgent
 import tiktoken
-from websocietysimulator.llm import LLMBase, InfinigenceLLM, GeminiLLM
-from websocietysimulator.agent.modules.planning_modules import PlanningBase
-from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
+from ..websocietysimulator.llm import LLMBase, InfinigenceLLM, GeminiLLM
+from ..websocietysimulator.agent.modules.planning_modules import PlanningBase
+from ..websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 import re
 import logging
 import time
