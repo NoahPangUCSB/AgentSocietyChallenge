@@ -523,10 +523,10 @@ class RecommendationAgentCS245(RecommendationAgent):
                 "function": self.interaction_tool.get_reviews,
                 "description": "Fetch reviews filtered by various parameters",
                 "parameters": {
+                    "item_ids": "Optional[List[str]]",
                     "item_id": "Optional[str]",
                     "user_id": "Optional[str]",
                     "review_id": "Optional[str]",
-                    "item_ids": "Optional[List[str]"
                 },
             },
         }
