@@ -399,6 +399,7 @@ class RecReasoning(ReasoningBase):
             llm_output = self.llm(
                 messages=[
                     {"role": "system", "content": task_description},
+                    {"role": "assistant", "content": reasoning_process},
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
@@ -432,6 +433,8 @@ class RecReasoning(ReasoningBase):
             """
         }
 
+        final_assistant = {"role": "assistant", "content": reasoning_process}
+
         final_user = {
             "role": "user",
             "content": f"""
@@ -453,7 +456,7 @@ class RecReasoning(ReasoningBase):
                 YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
             """
         }
-        reasoning_result = self.llm(messages=[final_system, final_user], temperature=0.1, max_tokens=1500)
+        reasoning_result = self.llm(messages=[final_system, final_assistant, final_user], temperature=0.1, max_tokens=1500)
         # reasoning_result = self.llm(
         #     messages=[
         #         {
