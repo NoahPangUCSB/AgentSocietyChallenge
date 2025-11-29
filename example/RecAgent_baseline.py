@@ -82,7 +82,7 @@ class RecReasoning(ReasoningBase):
         reasoning_result = self.llm(
             messages=messages,
             temperature=0.1,
-            max_tokens=1000
+            max_tokens=2000
         )
         print(reasoning_result)
         return reasoning_result
