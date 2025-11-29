@@ -129,7 +129,7 @@ class GeminiLLM(LLMBase):
         model: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 1000,
-        stop_strs: Optional[List[str]] = [],
+        stop_strs: Optional[List[str]] = None,
         n: int = 1
     ) -> Union[str, List[str]]:
         print("Gemini Messages:", messages)
@@ -138,7 +138,7 @@ class GeminiLLM(LLMBase):
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
-            stop=stop_strs,
+            # stop=stop_strs,
             n=n
         )
 
