@@ -143,9 +143,9 @@ class RecPlanning(PlanningBase):
 
           3. Steps about REVIEW information:
             - The description MUST contain the word "review".
-            - The description MUST NOT contain the words "user" or "item".
-            - Example (valid): "Next, I need to gather review information"
-            - Example (invalid): "I need to check user review history"
+            - The description MUST CLEARLY INDICATE what type of review information is being gathered (user reviews or item reviews). DO NOT include BOTH user and item reviews in the same step.
+            - Example (valid): "Next, I need to gather review information on the user"
+            - Example (invalid): "I need to check user and item review history"
 
           4. Steps about designing or applying a ranking method:
             - The description MUST NOT contain the words "user", "item", or "review".
