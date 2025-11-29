@@ -138,6 +138,8 @@ class GeminiLLM(LLMBase):
             "temperature": temperature,
             "max_tokens": max_tokens,
             "n": n,
+            "presence_penalty": 1.0,
+            "frequency_penalty": 1.0
         }
 
         if response_format is not None:
