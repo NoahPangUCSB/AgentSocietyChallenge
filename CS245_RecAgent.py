@@ -452,7 +452,7 @@ class RecReasoning(ReasoningBase):
             """
         }
         reasoning_result = self.llm(messages=[final_assistant, final_system, final_user], temperature=0.1, max_tokens=24576)
-        
+        print("Final reasoning result:", reasoning_result)
         return reasoning_result
 
 
