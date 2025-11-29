@@ -1,14 +1,23 @@
+import sys
+import os
+
+# Get the path to the directory "one level up"
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+
+# Add parent directory to system path
+sys.path.append(parent_dir)
+
 import json
-from ..websocietysimulator import Simulator
-from ..websocietysimulator.agent import RecommendationAgent
+from websocietysimulator import Simulator
+from websocietysimulator.agent import RecommendationAgent
 import tiktoken
-from ..websocietysimulator.llm import LLMBase, InfinigenceLLM, GeminiLLM
-from ..websocietysimulator.agent.modules.planning_modules import PlanningBase
-from ..websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
+from websocietysimulator.llm import LLMBase, InfinigenceLLM, GeminiLLM
+from websocietysimulator.agent.modules.planning_modules import PlanningBase
+from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 import re
 import logging
 import time
-import os
 logging.basicConfig(level=logging.INFO)
 
 def num_tokens_from_string(string: str) -> int:
