@@ -526,6 +526,7 @@ class RecommendationAgentCS245(RecommendationAgent):
                     "item_id": "Optional[str]",
                     "user_id": "Optional[str]",
                     "review_id": "Optional[str]",
+                    "item_ids": "Optional[List[str]"
                 },
             },
         }
