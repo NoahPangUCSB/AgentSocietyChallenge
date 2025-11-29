@@ -410,49 +410,53 @@ class RecReasoning(ReasoningBase):
             print("LLM Output:", llm_output)
             action = json.loads(llm_output)
             reasoning_process[step['description']] = [action]
-            if 'tool' in action and action['tool'] in self.tools:
-                tool_name = action['tool']
-                tool_input = action['tool_input']
+            if 'action' in action and action['action'] in self.tools:
+                tool_name = action['action']
+                tool_input = action['action_input']
                 tool_output = self.tools[tool_name]['function'](**tool_input)
                 print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
                 reasoning_process[step['description']].append(tool_output)
+            elif 'action' in action and action['action'] == 'FINISH':
+                print("Final answer reached.")
+                reasoning_result = action
+                break
         
-        final_system = {
-            "role": "system",
-            "content": """
-                You are a recommendation agent. OUTPUT EXACTLY ONE JSON OBJECT and ONLY JSON.
-                Do NOT output any text, code, or markdown. Do NOT output Python or code fences. 
-                The JSON MUST match this schema exactly: 
-                {{ 'analysis': '<string>', 'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short>'}}, ...], 'ranked_ids': ['id1','id2',...] }}
-            """
-        }
+        # final_system = {
+        #     "role": "system",
+        #     "content": """
+        #         You are a recommendation agent. OUTPUT EXACTLY ONE JSON OBJECT and ONLY JSON.
+        #         Do NOT output any text, code, or markdown. Do NOT output Python or code fences. 
+        #         The JSON MUST match this schema exactly: 
+        #         {{ 'analysis': '<string>', 'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short>'}}, ...], 'ranked_ids': ['id1','id2',...] }}
+        #     """
+        # }
 
-        final_assistant = {"role": "assistant", "content": str(reasoning_process)}
+        # final_assistant = {"role": "assistant", "content": str(reasoning_process)}
 
-        final_user = {
-            "role": "user",
-            "content": f"""
-                Use your previous reasoning process to rank the candidate items for the user.
-                Candidate item IDs: {json.dumps(items)}
-                For each candidate, assign an integer score between 0 and 100 (higher is better) based on how likely the user would highly rate the candidate, give a one-line justification,
-                and produce ranked_ids ordered by score descending. Output ONLY the final JSON object:
-                {{ 'analysis': '<string>', 'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short>'}}, ...], 'ranked_ids': ['id1','id2',...] }}
-                NOTHING else. For instance:
-                {{
-                  'analysis': 'Based on the user preferences and item features, I evaluated each candidate as follows...',
-                  'scores': [
-                    {{'id': 'item_123', 'score': 95, 'justification': 'Highly matches user preferences for fine dining'}},
-                    {{'id': 'item_456', 'score': 80, 'justification': 'Good match but lacks some features such as outdoor seating'}},
-                    ...
-                  ],
-                  'ranked_ids': ['item_123', 'item_456', ...]
-                }}
-                YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
-                If you deviate from the format even slightly, I will terminate the run. Output ONLY the format.”
-            """
-        }
-        reasoning_result = self.llm(messages=[final_assistant, final_system, final_user], temperature=0.1, max_tokens=24576)
-        print("Final reasoning result:", reasoning_result)
+        # final_user = {
+        #     "role": "user",
+        #     "content": f"""
+        #         Use your previous reasoning process to rank the candidate items for the user.
+        #         Candidate item IDs: {json.dumps(items)}
+        #         For each candidate, assign an integer score between 0 and 100 (higher is better) based on how likely the user would highly rate the candidate, give a one-line justification,
+        #         and produce ranked_ids ordered by score descending. Output ONLY the final JSON object:
+        #         {{ 'analysis': '<string>', 'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short>'}}, ...], 'ranked_ids': ['id1','id2',...] }}
+        #         NOTHING else. For instance:
+        #         {{
+        #           'analysis': 'Based on the user preferences and item features, I evaluated each candidate as follows...',
+        #           'scores': [
+        #             {{'id': 'item_123', 'score': 95, 'justification': 'Highly matches user preferences for fine dining'}},
+        #             {{'id': 'item_456', 'score': 80, 'justification': 'Good match but lacks some features such as outdoor seating'}},
+        #             ...
+        #           ],
+        #           'ranked_ids': ['item_123', 'item_456', ...]
+        #         }}
+        #         YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
+        #         If you deviate from the format even slightly, I will terminate the run. Output ONLY the format.”
+        #     """
+        # }
+        # reasoning_result = self.llm(messages=[final_assistant, final_system, final_user], temperature=0.1, max_tokens=24576)
+        # print("Final reasoning result:", reasoning_result)
         return reasoning_result
 
 
@@ -616,7 +620,7 @@ class RecommendationAgentCS245(RecommendationAgent):
         reasoning_task_description = f"""
         You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
         
-        You can use the tools {self.tools} to gather necessary information about the user and items. If you use a tool, you MUST specify the tool name under "tool" and input parameters under "tool_input". 
+        You can use the tools {self.tools} to gather necessary information about the user and items. If you use a tool, you MUST specify the tool name under "action" and input parameters under "action_input". 
         The tool name MUST match exactly with one of the tool names provided. Make sure the input parameters are in the correct format as expected by the tool. 
         The information about each tool is included in the tool descriptions and parameter information is included as well.
 
@@ -626,8 +630,9 @@ class RecommendationAgentCS245(RecommendationAgent):
         OUTPUT FORMAT:
         {{
           "thoughts": "Your reasoning here",
-          "tool": "tool_name", 
-          "tool_input": {{input1: "value1", input2: "value2", ...}},
+          "action": "tool_name or FINISH", 
+          "action_input": {{input1: "value1", input2: "value2", ...}},
+          "ranked_ids": ["id1", "id2", ...]  // only if action is FINISH
         }}    
         NO code blocks, NO backticks, NO commentary. YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
         If you deviate from the format even slightly, I will terminate the run. Output ONLY the format.”
