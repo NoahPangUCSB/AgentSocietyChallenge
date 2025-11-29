@@ -282,6 +282,8 @@ class InfinigenceLLM(LLMBase):
                 n=n,
             )
             
+            choice = response.choices[0]
+            print(f"Finish Reason: {choice.finish_reason}")
             if n == 1:
                 return response.choices[0].message.content
             else:
