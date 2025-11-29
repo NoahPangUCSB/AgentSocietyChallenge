@@ -135,10 +135,13 @@ class GeminiLLM(LLMBase):
         print("Gemini Messages:", messages)
         response = self.client.chat.completions.create(
             model=model or self.model,
-            messages=[{
-            "role": "user",
-            "content": "Explain to me how AI works"
-        }],
+            messages=[
+              {"role": "system", "content": "You are a helpful assistant."},
+              {
+                  "role": "user",
+                  "content": "Explain to me how AI works"
+              }
+            ],
             temperature=temperature,
             max_tokens=max_tokens,
             stop=stop_strs,
