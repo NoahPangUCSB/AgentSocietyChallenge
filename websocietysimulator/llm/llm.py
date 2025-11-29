@@ -145,6 +145,8 @@ class GeminiLLM(LLMBase):
 
         response = self.client.chat.completions.create(**kwargs)
 
+        choice = response.choices[0]
+        print(f"Finish Reason: {choice.finish_reason}")
         if n == 1:
             return response.choices[0].message.content
 
@@ -282,8 +284,6 @@ class InfinigenceLLM(LLMBase):
                 n=n,
             )
             
-            choice = response.choices[0]
-            print(f"Finish Reason: {choice}")
             if n == 1:
                 return response.choices[0].message.content
             else:
