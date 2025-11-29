@@ -404,7 +404,7 @@ class RecReasoning(ReasoningBase):
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
-                max_tokens=1000,
+                max_tokens=8192,
                 response_format={"type": "json_object"},
             )
             print("LLM Output:", llm_output)
