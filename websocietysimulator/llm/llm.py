@@ -109,7 +109,7 @@ class OllamaLLM(LLMBase):
         return self.embedding_model
 
 class GeminiLLM(LLMBase):
-    def __init__(self, api_key: str, model: str = "gemini-1.5-pro"):
+    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
         """
         Gemini LLM through the OpenAI-compatible API
         """
