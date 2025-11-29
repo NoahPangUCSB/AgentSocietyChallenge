@@ -172,7 +172,7 @@ class MyRecommendationAgent(RecommendationAgent):
 
 
 if __name__ == "__main__":
-    task_set = "amazon" # "goodreads" or "yelp"
+    task_set = "yelp" # "goodreads" or "yelp" or "amazon"
     # Initialize Simulator
     simulator = Simulator(data_dir="processed_datasets", device="auto", cache=True)
 
