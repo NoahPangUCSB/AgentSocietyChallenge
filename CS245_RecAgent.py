@@ -67,9 +67,10 @@ class RecPlanning(PlanningBase):
                 messages=[
                     {
                         "role": "system",
-                        "content": (
-                            "You are the PLANNING MODULE for a recommendation agent. "
-                            "Your job is ONLY to create a JSON plan for how the agent should proceed."
+                        "content": ("""
+                            You are the PLANNING MODULE for a recommendation agent.
+                            Your job is ONLY to create a JSON plan for how the agent should proceed.
+                            """ 
                         ),
                     },
                     {
