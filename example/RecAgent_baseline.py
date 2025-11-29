@@ -1,8 +1,18 @@
+import sys
+import os
+
+# Get the path to the directory "one level up"
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+
+# Add parent directory to system path
+sys.path.append(parent_dir)
+
 import json
 from websocietysimulator import Simulator
 from websocietysimulator.agent import RecommendationAgent
 import tiktoken
-from websocietysimulator.llm import LLMBase, InfinigenceLLM
+from websocietysimulator.llm import LLMBase, InfinigenceLLM, GeminiLLM
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 import re
@@ -72,9 +82,9 @@ class RecReasoning(ReasoningBase):
         reasoning_result = self.llm(
             messages=messages,
             temperature=0.1,
-            max_tokens=1000
+            max_tokens=8096
         )
-        
+        print(reasoning_result)
         return reasoning_result
 
 class MyRecommendationAgent(RecommendationAgent):
@@ -162,18 +172,19 @@ class MyRecommendationAgent(RecommendationAgent):
 
 
 if __name__ == "__main__":
-    task_set = "amazon" # "goodreads" or "yelp"
+    task_set = "yelp" # "goodreads" or "yelp" or "amazon"
     # Initialize Simulator
-    simulator = Simulator(data_dir="your data_dir", device="auto", cache=True)
+    simulator = Simulator(data_dir="processed_datasets", device="auto", cache=True)
 
     # Load scenarios
-    simulator.set_task_and_groundtruth(task_dir=f"./track2/{task_set}/tasks", groundtruth_dir=f"./track2/{task_set}/groundtruth")
+    simulator.set_task_and_groundtruth(task_dir=f"./example/track2/{task_set}/tasks", groundtruth_dir=f"./example/track2/{task_set}/groundtruth")
 
     # Set your custom agent
     simulator.set_agent(MyRecommendationAgent)
 
     # Set LLM client
-    simulator.set_llm(InfinigenceLLM(api_key="your api_key"))
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    simulator.set_llm(GeminiLLM(api_key=GEMINI_API_KEY))
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.

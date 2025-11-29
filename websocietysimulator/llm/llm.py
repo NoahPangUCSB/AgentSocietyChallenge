@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Union
 from openai import OpenAI
 from langchain_openai import OpenAIEmbeddings
+from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
 from .infinigence_embeddings import InfinigenceEmbeddings
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import logging
@@ -106,6 +107,72 @@ class OllamaLLM(LLMBase):
     
     def get_embedding_model(self):
         return self.embedding_model
+
+class GeminiLLM(LLMBase):
+    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
+        """
+        Gemini LLM through the OpenAI-compatible API
+        """
+        super().__init__(model)
+
+        # IMPORTANT ↓↓↓
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+        )
+
+        self.embedding_model_name = "models/embedding-001"
+    
+    @retry(
+        retry=retry_if_exception_type(Exception), # Or catch specific 429 errors if possible
+        wait=wait_random_exponential(multiplier=1, max=60), # Wait 2s, then 4s, then 8s...
+        stop=stop_after_attempt(10)
+    )
+    def __call__(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: float = 0.1,
+        max_tokens: int = 1000,
+        stop_strs: Optional[List[str]] = None,
+        n: int = 1,
+        response_format: Optional[Dict[str, str]] = None
+    ) -> Union[str, List[str]]:
+        kwargs = {
+            "model": model or self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "n": n,
+        }
+
+        if response_format is not None:
+            kwargs["response_format"] = response_format
+
+        response = self.client.chat.completions.create(**kwargs)
+
+        choice = response.choices[0]
+        print(f"Finish Reason: {choice.finish_reason}")
+        if n == 1:
+            return response.choices[0].message.content
+
+        return [choice.message.content for choice in response.choices]
+
+    # -------------------------
+    # Embeddings
+    # -------------------------
+    def get_embedding_model(self):
+        return self
+    
+    def embed(self, text: str):
+        """
+        Create embeddings using Gemini's embedding model
+        """
+        res = self.client.embeddings.create(
+            model=self.embedding_model_name,
+            input=text
+        )
+        return res.data[0].embedding
 class DeepseekLLM(LLMBase):
     def __init__(self, api_key: str, model: str = "deepseek-chat"):
         """

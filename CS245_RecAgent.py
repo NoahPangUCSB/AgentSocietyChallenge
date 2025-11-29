@@ -2,7 +2,7 @@ import json
 from websocietysimulator import Simulator
 from websocietysimulator.agent import RecommendationAgent
 import tiktoken
-from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, DeepseekLLM, OllamaLLM
+from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, DeepseekLLM, OllamaLLM, GeminiLLM
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 from websocietysimulator.agent.modules.memory_modules import MemoryBase
@@ -41,9 +41,10 @@ class RecPlanning(PlanningBase):
       - Can condition on global feedback to refine planning over runs.
     """
 
-    def __init__(self, llm: LLMBase, num_candidate_plans: int = 2):
+    def __init__(self, llm: LLMBase, num_candidate_plans: int = 2, max_tokens: int = 1500):
         super().__init__(llm=llm)
         self.num_candidate_plans = max(1, num_candidate_plans)
+        self.max_tokens = max_tokens
 
     def __call__(self, task_type: str, task_description: str,
                  feedback: str = '', few_shot: str = '') -> list[dict]:
@@ -67,9 +68,10 @@ class RecPlanning(PlanningBase):
                 messages=[
                     {
                         "role": "system",
-                        "content": (
-                            "You are the PLANNING MODULE for a recommendation agent. "
-                            "Your job is ONLY to create a JSON plan for how the agent should proceed."
+                        "content": ("""
+                            You are the PLANNING MODULE for a recommendation agent.
+                            Your job is ONLY to create a JSON plan for how the agent should proceed.
+                            """ 
                         ),
                     },
                     {
@@ -78,7 +80,7 @@ class RecPlanning(PlanningBase):
                     },
                 ],
                 temperature=0.3,  # small diversity to get different plans
-                max_tokens=800,
+                max_tokens=self.max_tokens,
             )
 
             plan_dict = self._parse_plan_from_llm_output(llm_output)
@@ -142,16 +144,16 @@ class RecPlanning(PlanningBase):
 
           3. Steps about REVIEW information:
             - The description MUST contain the word "review".
-            - The description MUST NOT contain the words "user" or "item".
-            - Example (valid): "Next, I need to gather review information"
-            - Example (invalid): "I need to check user review history"
+            - The description MUST CLEARLY INDICATE what type of review information is being gathered (user reviews or item reviews). DO NOT include BOTH user and item reviews in the same step.
+            - Example (valid): "Next, I need to gather review information on the user"
+            - Example (invalid): "I need to check user and item review history"
 
           4. Steps about designing or applying a ranking method:
             - The description MUST NOT contain the words "user", "item", or "review".
             - Example (valid): "Next, I need to design a ranking method based on the collected information"
             - Example (valid): "Finally, I need to apply the ranking method to produce the final ranked list"
 
-          5. The plan should have between 4 and 6 sub-tasks, and MUST include:
+          5. The plan should have between 4 and 8 sub-tasks, and MUST include:
             - At least one USER-only step (rule 1)
             - At least one ITEM-only step (rule 2)
             - At least one REVIEW-only step (rule 3)
@@ -295,40 +297,40 @@ class RecPlanning(PlanningBase):
         critic_input_str = json.dumps(critic_input, ensure_ascii=False, indent=2)
 
         prompt = f"""
-You are evaluating planning strategies for a recommendation agent.
+        You are evaluating planning strategies for a recommendation agent.
 
-Task type:
-{task_type}
+        Task type:
+        {task_type}
 
-Task description:
-\"\"\"{task_description}\"\"\" 
+        Task description:
+        \"\"\"{task_description}\"\"\" 
 
-Previous feedback (may be empty):
-\"\"\"{feedback}\"\"\" 
+        Previous feedback (may be empty):
+        \"\"\"{feedback}\"\"\" 
 
-Candidate plans (JSON list):
-{critic_input_str}
+        Candidate plans (JSON list):
+        {critic_input_str}
 
-For each plan, consider:
-  - Does it clearly separate user / item / review steps?
-  - Does it follow the required keyword constraints?
-  - Does it gather enough information before designing a ranking method?
-  - Does it design and apply a reasonable ranking step?
+        For each plan, consider:
+          - Does it clearly separate user / item / review steps?
+          - Does it follow the required keyword constraints?
+          - Does it gather enough information before designing a ranking method?
+          - Does it design and apply a reasonable ranking step?
 
-Return ONLY a JSON object:
+        Return ONLY a JSON object:
 
-{{
-  "best_id": <int>,           // index of the best plan in the list
-  "justification": "<why this plan is best>"
-}}
-"""
+        {{
+          "best_id": <int>,           // index of the best plan in the list
+          "justification": "<why this plan is best>"
+        }}
+        """
         critic_output = self.llm(
             messages=[
                 {"role": "system", "content": "You are a critical evaluator of planning strategies."},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
-            max_tokens=400,
+            max_tokens=self.max_tokens,
         )
 
         text = critic_output.strip()
@@ -386,72 +388,42 @@ Return ONLY a JSON object:
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
 
-    def __init__(self, profile_type_prompt, llm, tools):
+    def __init__(self, profile_type_prompt, llm, tools, max_tokens: int = 12288):
         """Initialize the reasoning module"""
         super().__init__(profile_type_prompt=profile_type_prompt, memory=None, llm=llm)
         self.tools = tools
+        self.max_tokens = max_tokens
 
     def __call__(self, user, items, task_description: str, plan: list[dict]):
         """Override the parent class's __call__ method"""
         reasoning_process = {}
         for step in plan:
             print("Sub-task:", step['description'])
+            thinkingStrings = ['design', 'apply']
+            thinkingStep = any(thinkingString in step.get('description', '') for thinkingString in thinkingStrings)
             llm_output = self.llm(
                 messages=[
+                    {"role": "assistant", "content": str(reasoning_process)},
                     {"role": "system", "content": task_description},
-                    {"role": "user", "content": step['description']},
+                    {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
-                max_tokens=1000,
-                response_format={'type': 'json_object'},
+                max_tokens= self.max_tokens*2 if thinkingStep else self.max_tokens,
+                response_format={"type": "json_object"},
             )
             print("LLM Output:", llm_output)
             action = json.loads(llm_output)
             reasoning_process[step['description']] = [action]
-            if 'tool' in action and action['tool'] in self.tools:
-                tool_name = action['tool']
-                tool_input = action['tool_input']
+            if 'action' in action and action['action'] in self.tools:
+                tool_name = action['action']
+                tool_input = action['action_input']
                 tool_output = self.tools[tool_name]['function'](**tool_input)
                 print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
                 reasoning_process[step['description']].append(tool_output)
-
-        reasoning_result = self.llm(
-            messages=[
-                {
-                    "role": "system",
-                    "content": '''You are a recommendation agent that makes final recommendations based on the reasoning process.
-                  You must always follow this format:
-
-                  - You MAY think freely between <reasoning> tags. This will NOT be shown to the user.
-                  - Your FINAL output must be a strict JSON following the schema: {'ranked_ids': [item_id1, item_id2, ...]}.
-
-                  You MUST NOT output code, functions, or explanations in the final response.
-                  Only JSON.
-                  If your output is not valid JSON EXACTLY matching the format, regenerate it until it is valid.
-                  Never output code.
-                  Never output natural language.
-                 ''',
-                },
-                {
-                    "role": "user",
-                    "content": f'''Please use the reasoning given here: {reasoning_process} to rank the item IDs from the candidate items: 
-                  {items} 
-                  for the user: {user}. 
-                  Your job is to 
-                  1. Evaluate each candidate in `candidate_list`
-                  2. Think step-by-step internally (in a hidden `analysis` field) about how well each candidate matches the user's preferences based on the reasoning process provided.
-                  3. Produce a final ranked list of candidate IDs in a JSON object by assigning each candidate a numeric relevance score from 0-100 (higher is better) and sorting them accordingly.
-
-                  Your output should be ONLY be strictly valid JSON with a ranked item list of {items} with the following format: 
-                  {{
-                    'analysis': 'your internal reasoning here, do NOT show this to the user',
-                    'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short summary>'}}, ...],
-                    'ranked_ids': ['item id1', 'item id2', 'item id3', ...]
-                  }}
-                  Only output the JSON, do NOT output any other text.
-                  Analysis should be your chain of thought. Resulting ranked_ids must be based on the analysis and only include items from the candidate list.'''}],
-                temperature=0.1,
-                max_tokens=1500)
+            elif 'action' in action and action['action'] == 'FINISH':
+                reasoning_result = str(action.get('ranked_ids', '[]'))
+                print("Final answer reached.", reasoning_result)
+                break
         
         return reasoning_result
 
@@ -493,7 +465,7 @@ class RecommendationAgentCS245(RecommendationAgent):
         super().__init__(llm=llm)
         # each agent instance reads the current global feedback
         self.global_feedback = RecommendationAgentCS245.GLOBAL_FEEDBACK
-        self.planning = RecPlanning(llm=self.llm, num_candidate_plans=2)
+        self.planning = RecPlanning(llm=self.llm)
         self.tools = {}
         self.reasoning: RecReasoning | None = None
 
@@ -519,6 +491,7 @@ class RecommendationAgentCS245(RecommendationAgent):
                 "function": self.interaction_tool.get_reviews,
                 "description": "Fetch reviews filtered by various parameters",
                 "parameters": {
+                    "item_ids": "Optional[List[str]]",
                     "item_id": "Optional[str]",
                     "user_id": "Optional[str]",
                     "review_id": "Optional[str]",
@@ -533,6 +506,15 @@ class RecommendationAgentCS245(RecommendationAgent):
         user_id = self.task['user_id']
         candidate_list = self.task['candidate_list']
 
+        simulation_config = {
+            "num_candidate_plans": 1,
+            "max_reasoning_tokens": 4096,
+            "max_planning_tokens": 1024,
+        }
+
+        self.planning.num_candidate_plans = simulation_config["num_candidate_plans"]
+        self.reasoning.max_tokens = simulation_config["max_reasoning_tokens"]
+        self.planning.max_tokens = simulation_config["max_planning_tokens"]
         # --- PLANNING: multi-plan + selection, with global feedback ---
 
         plan_task_description = f"""
@@ -613,40 +595,26 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         # --- TASK DESCRIPTION FOR FINAL REASONING / RANKING ---
 
-        task_description = f"""
-        You are a real user on an online platform. Your historical item review text and stars are as follows: {history_review}. 
-        Now you need to rank the following items: {candidate_list} according to their match degree to your preference.
-        Please rank the more interesting items earlier in your ranked list.
-        The information of these candidate items is as follows: {item_list}.
-
-        Your final output should be ONLY a ranked item list of {candidate_list} with the following format, DO NOT introduce any other item ids!
-        DO NOT output your analysis process!
-
-The correct output format:
-
-        ['item id1', 'item id2', 'item id3', ...]
-        """
-
         reasoning_task_description = f"""
-        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences.
-        You are given the user id: {user_id} and a list of candidate items to rank: {candidate_list}.
+        You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
+        
+        You can use the tools {self.tools} to gather necessary information about the user and items. If you use a tool, you MUST specify the tool name under "action" and input parameters under "action_input". 
+        The tool name MUST match exactly with one of the tool names provided. Make sure the input parameters are in the correct format as expected by the tool. 
+        The information about each tool is included in the tool descriptions and parameter information is included as well.
 
-        You can use the tools {self.tools} to gather necessary information about the user and items. 
-        If you use a tool, you must specify the tool name and input parameters. The tool name MUST match exactly with one of the tool names provided.
-        Make sure the input parameters are in the correct format as expected by the tool.
-
-        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it.
-        If you need to use a tool, you NEED to specify the tool name under "tool" and input parameters under "tool_input" — just specifying the tool under "action" is NOT enough.
-
-        Otherwise, you should do reasoning on the information you have gathered to produce the final ranked list of item IDs. 
-        The format should strictly follow the example below:
-
+        You are also given a plan you should follow. For each sub-task in the plan, you should create an action and execute it. For example, if the sub-task is to gather user information, you should create an action that uses the get_user tool with the appropriate user_id.
+        You should also include your thoughts and reasoning for each action you take. Your reasoning should be relatively concise. 
+        When action is FINISH, ranked_ids MUST ALSO be populated. You must include all the candidate ids in your final ranked_ids list.
+        
+        OUTPUT FORMAT:
         {{
           "thoughts": "Your reasoning here",
-          "action": "string", 
-          "tool": "tool_name", 
-          "tool_input": {{ "input1": "value1", "input2": "value2", ... }}
-        }}
+          "action": "tool_name or FINISH", 
+          "action_input": {{input1: "value1", input2: "value2", ...}},
+          "ranked_ids": ["id1", "id2", ...]  // only if action is FINISH
+        }}    
+        NO code blocks, NO backticks, NO commentary. YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
+        If you deviate from the format even slightly, I will terminate the run. Output ONLY the format.”
         """
 
         result = self.reasoning(
@@ -685,12 +653,14 @@ The correct output format:
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
+
     task_set = "yelp"  # "goodreads" or "yelp"
-    num_tasks = 1      # adjust if you want more
+    num_tasks = None      # adjust if you want more
 
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
     # -------- PHASE 1: initial run to gather feedback --------
 
@@ -701,7 +671,7 @@ if __name__ == "__main__":
     )
 
     simulator1.set_agent(RecommendationAgentCS245)
-    simulator1.set_llm(OllamaLLM())  # or another LLMBase subclass
+    simulator1.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
 
     agent_outputs_1 = simulator1.run_simulation(
         number_of_tasks=num_tasks, enable_threading=True, max_workers=10
@@ -733,7 +703,7 @@ if __name__ == "__main__":
     )
 
     simulator2.set_agent(RecommendationAgentCS245)
-    simulator2.set_llm(OllamaLLM())
+    simulator2.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
 
     agent_outputs_2 = simulator2.run_simulation(
         number_of_tasks=num_tasks, enable_threading=True, max_workers=10
