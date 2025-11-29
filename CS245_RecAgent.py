@@ -329,7 +329,7 @@ class RecPlanning(PlanningBase):
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
-            max_tokens=1000,
+            max_tokens=8096,
         )
 
         text = critic_output.strip()
