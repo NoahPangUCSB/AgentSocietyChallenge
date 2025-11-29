@@ -127,15 +127,15 @@ class GeminiLLM(LLMBase):
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
-        temperature: float = 0.0,
-        max_tokens: int = 500,
+        temperature: float = 0.1,
+        max_tokens: int = 1000,
         stop_strs: Optional[List[str]] = None,
         n: int = 1
     ) -> Union[str, List[str]]:
         print("Gemini Messages:", messages)
         response = self.client.chat.completions.create(
             model=model or self.model,
-            messages=messages,
+            messages="This is a test message.",
             temperature=temperature,
             max_tokens=max_tokens,
             stop=stop_strs,
