@@ -399,6 +399,8 @@ class RecReasoning(ReasoningBase):
         reasoning_process = {}
         for step in plan:
             print("Sub-task:", step['description'])
+            thinkingStrings = ['design', 'apply']
+            thinkingStep = any(thinkingString in step.get('description', '') for thinkingString in thinkingStrings)
             llm_output = self.llm(
                 messages=[
                     {"role": "assistant", "content": str(reasoning_process)},
@@ -406,7 +408,7 @@ class RecReasoning(ReasoningBase):
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
-                max_tokens=self.max_tokens,
+                max_tokens= self.max_tokens*2 if thinkingStep else self.max_tokens,
                 response_format={"type": "json_object"},
             )
             print("LLM Output:", llm_output)
@@ -542,8 +544,8 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         simulation_config = {
             "num_candidate_plans": 1,
-            "max_reasoning_tokens": 8192,
-            "max_planning_tokens": 2048,
+            "max_reasoning_tokens": 2048,
+            "max_planning_tokens": 1024,
         }
 
         self.planning.num_candidate_plans = simulation_config["num_candidate_plans"]
