@@ -152,7 +152,7 @@ class RecPlanning(PlanningBase):
             - Example (valid): "Next, I need to design a ranking method based on the collected information"
             - Example (valid): "Finally, I need to apply the ranking method to produce the final ranked list"
 
-          5. The plan should have between 4 and 6 sub-tasks, and MUST include:
+          5. The plan should have between 4 and 8 sub-tasks, and MUST include:
             - At least one USER-only step (rule 1)
             - At least one ITEM-only step (rule 2)
             - At least one REVIEW-only step (rule 3)
