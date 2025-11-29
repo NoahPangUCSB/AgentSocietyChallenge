@@ -495,11 +495,11 @@ class RecommendationAgentCS245(RecommendationAgent):
     # Global feedback shared across agent instances (global refinement)
     GLOBAL_FEEDBACK: str = ""
 
-    def __init__(self, llm: LLMBase, num_candidate_plans: int = 2):
+    def __init__(self, llm: LLMBase):
         super().__init__(llm=llm)
         # each agent instance reads the current global feedback
         self.global_feedback = RecommendationAgentCS245.GLOBAL_FEEDBACK
-        self.planning = RecPlanning(llm=self.llm, num_candidate_plans=num_candidate_plans)
+        self.planning = RecPlanning(llm=self.llm)
         self.tools = {}
         self.reasoning: RecReasoning | None = None
 
@@ -540,6 +540,12 @@ class RecommendationAgentCS245(RecommendationAgent):
         user_id = self.task['user_id']
         candidate_list = self.task['candidate_list']
 
+        simulation_config = {
+            "num_candidate_plans": 1,
+        }
+
+        self.planning.num_candidate_plans = simulation_config["num_candidate_plans"]
+        
         # --- PLANNING: multi-plan + selection, with global feedback ---
 
         plan_task_description = f"""
@@ -678,9 +684,6 @@ class RecommendationAgentCS245(RecommendationAgent):
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    simulation_config ={
-        "num_candidate_plans": 1,
-    }
 
     task_set = "yelp"  # "goodreads" or "yelp"
     num_tasks = None      # adjust if you want more
@@ -698,7 +701,7 @@ if __name__ == "__main__":
         groundtruth_dir=f"./example/track2/{task_set}/groundtruth",
     )
 
-    simulator1.set_agent(RecommendationAgentCS245(**simulation_config))
+    simulator1.set_agent(RecommendationAgentCS245)
     simulator1.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
 
     agent_outputs_1 = simulator1.run_simulation(
