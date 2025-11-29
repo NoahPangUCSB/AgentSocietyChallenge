@@ -544,7 +544,7 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         simulation_config = {
             "num_candidate_plans": 1,
-            "max_reasoning_tokens": 2048,
+            "max_reasoning_tokens": 4096,
             "max_planning_tokens": 1024,
         }
 
