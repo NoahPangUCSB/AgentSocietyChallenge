@@ -41,9 +41,10 @@ class RecPlanning(PlanningBase):
       - Can condition on global feedback to refine planning over runs.
     """
 
-    def __init__(self, llm: LLMBase, num_candidate_plans: int = 2):
+    def __init__(self, llm: LLMBase, num_candidate_plans: int = 2, max_tokens: int = 1500):
         super().__init__(llm=llm)
         self.num_candidate_plans = max(1, num_candidate_plans)
+        self.max_tokens = max_tokens
 
     def __call__(self, task_type: str, task_description: str,
                  feedback: str = '', few_shot: str = '') -> list[dict]:
@@ -79,7 +80,7 @@ class RecPlanning(PlanningBase):
                     },
                 ],
                 temperature=0.3,  # small diversity to get different plans
-                max_tokens=2000,
+                max_tokens=self.max_tokens,
             )
 
             plan_dict = self._parse_plan_from_llm_output(llm_output)
@@ -329,7 +330,7 @@ class RecPlanning(PlanningBase):
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
-            max_tokens=8096,
+            max_tokens=self.max_tokens,
         )
 
         text = critic_output.strip()
@@ -387,10 +388,11 @@ class RecPlanning(PlanningBase):
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
 
-    def __init__(self, profile_type_prompt, llm, tools):
+    def __init__(self, profile_type_prompt, llm, tools, max_tokens: int = 12288):
         """Initialize the reasoning module"""
         super().__init__(profile_type_prompt=profile_type_prompt, memory=None, llm=llm)
         self.tools = tools
+        self.max_tokens = max_tokens
 
     def __call__(self, user, items, task_description: str, plan: list[dict]):
         """Override the parent class's __call__ method"""
@@ -404,7 +406,7 @@ class RecReasoning(ReasoningBase):
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
-                max_tokens=24576,
+                max_tokens=self.max_tokens,
                 response_format={"type": "json_object"},
             )
             print("LLM Output:", llm_output)
@@ -493,11 +495,11 @@ class RecommendationAgentCS245(RecommendationAgent):
     # Global feedback shared across agent instances (global refinement)
     GLOBAL_FEEDBACK: str = ""
 
-    def __init__(self, llm: LLMBase):
+    def __init__(self, llm: LLMBase, num_candidate_plans: int = 2):
         super().__init__(llm=llm)
         # each agent instance reads the current global feedback
         self.global_feedback = RecommendationAgentCS245.GLOBAL_FEEDBACK
-        self.planning = RecPlanning(llm=self.llm, num_candidate_plans=1)
+        self.planning = RecPlanning(llm=self.llm, num_candidate_plans=num_candidate_plans)
         self.tools = {}
         self.reasoning: RecReasoning | None = None
 
@@ -676,6 +678,10 @@ class RecommendationAgentCS245(RecommendationAgent):
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    simulation_config ={
+        "num_candidate_plans": 1,
+    }
+
     task_set = "yelp"  # "goodreads" or "yelp"
     num_tasks = None      # adjust if you want more
 
@@ -692,7 +698,7 @@ if __name__ == "__main__":
         groundtruth_dir=f"./example/track2/{task_set}/groundtruth",
     )
 
-    simulator1.set_agent(RecommendationAgentCS245)
+    simulator1.set_agent(RecommendationAgentCS245(**simulation_config))
     simulator1.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
 
     agent_outputs_1 = simulator1.run_simulation(
