@@ -79,7 +79,7 @@ class RecPlanning(PlanningBase):
                     },
                 ],
                 temperature=0.3,  # small diversity to get different plans
-                max_tokens=800,
+                max_tokens=2000,
             )
 
             plan_dict = self._parse_plan_from_llm_output(llm_output)
@@ -329,7 +329,7 @@ class RecPlanning(PlanningBase):
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
-            max_tokens=400,
+            max_tokens=1000,
         )
 
         text = critic_output.strip()
@@ -451,7 +451,7 @@ class RecReasoning(ReasoningBase):
                 If you deviate from the format even slightly, I will terminate the run. Output ONLY the format.”
             """
         }
-        reasoning_result = self.llm(messages=[final_assistant, final_system, final_user], temperature=0.1, max_tokens=1500)
+        reasoning_result = self.llm(messages=[final_assistant, final_system, final_user], temperature=0.1, max_tokens=8192)
         # reasoning_result = self.llm(
         #     messages=[
         #         {
