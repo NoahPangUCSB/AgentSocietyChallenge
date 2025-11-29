@@ -404,14 +404,7 @@ class RecReasoning(ReasoningBase):
                 ],
                 temperature=0.1,
                 max_tokens=1000,
-                response_format={"type": "json_schema",
-                                  "json_schema": {
-                                    "thoughts": "string",
-                                    "tool": "string",
-                                    "tool_input": {
-                                      "type": "string",
-                                    }
-                                  }},
+                response_format={"type": "json_object"},
             )
             print("LLM Output:", llm_output)
             action = json.loads(llm_output)
