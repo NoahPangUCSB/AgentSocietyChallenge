@@ -398,8 +398,8 @@ class RecReasoning(ReasoningBase):
             print("Sub-task:", step['description'])
             llm_output = self.llm(
                 messages=[
-                    {"role": "system", "content": task_description},
                     {"role": "assistant", "content": str(reasoning_process)},
+                    {"role": "system", "content": task_description},
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
@@ -454,9 +454,10 @@ class RecReasoning(ReasoningBase):
                   'ranked_ids': ['item_123', 'item_456', ...]
                 }}
                 YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
+                If you deviate from the format even slightly, I will terminate the run. Output ONLY the format.”
             """
         }
-        reasoning_result = self.llm(messages=[final_system, final_assistant, final_user], temperature=0.1, max_tokens=1500)
+        reasoning_result = self.llm(messages=[final_assistant, final_system, final_user], temperature=0.1, max_tokens=1500)
         # reasoning_result = self.llm(
         #     messages=[
         #         {
@@ -691,7 +692,7 @@ class RecommendationAgentCS245(RecommendationAgent):
           "tool_input": {{input1: "value1", input2: "value2", ...}},
         }}    
         NO code blocks, NO backticks, NO commentary. YOUR ENTIRE RESPONSE MUST BE A SINGLE, VALID JSON OBJECT. DO NOT INCLUDE ANY CONVERSATIONAL TEXT, EXPLANATIONS, OR MARKDOWN OUTSIDE THE JSON. ONLY OUTPUT THE JSON.
-
+        If you deviate from the format even slightly, I will terminate the run. Output ONLY the format.”
         """
 
         result = self.reasoning(
