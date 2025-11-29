@@ -451,49 +451,7 @@ class RecReasoning(ReasoningBase):
                 If you deviate from the format even slightly, I will terminate the run. Output ONLY the format.”
             """
         }
-        reasoning_result = self.llm(messages=[final_assistant, final_system, final_user], temperature=0.1, max_tokens=8192)
-        # reasoning_result = self.llm(
-        #     messages=[
-        #         {
-        #             "role": "system",
-        #             "content": '''You are a recommendation agent that makes final recommendations based on the reasoning process.
-        #           You must always follow this format:
-
-        #           - You MAY think freely between <reasoning> tags. This will NOT be shown to the user.
-        #           - Your FINAL output must be a strict JSON following the schema: 
-        #           {{
-        #             'analysis': '<your internal reasoning here>',
-        #             'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short summary>'}}, ...],
-        #             'ranked_ids': [item_id1, item_id2, ...]
-        #           }}.
-
-        #           You MUST NOT output code, functions, or explanations in the final response.
-        #           Only JSON.
-        #           If your output is not valid JSON EXACTLY matching the format, regenerate it until it is valid.
-        #           Never output code.
-        #           Never output natural language.
-        #          ''',
-        #         },
-        #         {
-        #             "role": "user",
-        #             "content": f'''Please use the reasoning given here: {reasoning_process} to rank the item IDs from the candidate items: 
-        #           {items} 
-        #           for the user: {user}. 
-        #           Your job is to 
-        #           1. Evaluate each candidate in `candidate_list`
-        #           2. Think step-by-step internally (in a hidden `analysis` field) about how well each candidate matches the user's preferences based on the reasoning process provided.
-        #           3. Produce a final ranked list of candidate IDs in a JSON object by assigning each candidate a numeric relevance score from 0-100 (higher is better) and sorting them accordingly.
-
-        #           Your output should be ONLY be strictly valid JSON with a ranked item list of {items} with the following format: 
-        #           {{
-        #             'analysis': 'your internal reasoning here, do NOT show this to the user',
-        #             'scores': [{{'id': '<string>', 'score': <int>, 'justification': '<short summary>'}}, ...],
-        #             'ranked_ids': ['item id1', 'item id2', 'item id3', ...]
-        #           }}
-        #           Only output the JSON, do NOT output any other text.
-        #           Resulting ranked_ids must be based on the analysis and only include items from the candidate list.'''}],
-        #         temperature=0.1,
-        #         max_tokens=1500)
+        reasoning_result = self.llm(messages=[final_assistant, final_system, final_user], temperature=0.1, max_tokens=24576)
         
         return reasoning_result
 
@@ -654,20 +612,6 @@ class RecommendationAgentCS245(RecommendationAgent):
                 pass
 
         # --- TASK DESCRIPTION FOR FINAL REASONING / RANKING ---
-
-        task_description = f"""
-        You are a real user on an online platform. Your historical item review text and stars are as follows: {history_review}. 
-        Now you need to rank the following items: {candidate_list} according to their match degree to your preference.
-        Please rank the more interesting items earlier in your ranked list.
-        The information of these candidate items is as follows: {item_list}.
-
-        Your final output should be ONLY a ranked item list of {candidate_list} with the following format, DO NOT introduce any other item ids!
-        DO NOT output your analysis process!
-
-        The correct output format:
-
-        ['item id1', 'item id2', 'item id3', ...]
-        """
 
         reasoning_task_description = f"""
         You are a recommendation system tasked with ranking a list of candidate items for a user based on their preferences. You are given the user: {user_id} and a list of candidate items to rank: {candidate_list}.
