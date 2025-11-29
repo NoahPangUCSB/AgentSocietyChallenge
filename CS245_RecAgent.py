@@ -399,7 +399,7 @@ class RecReasoning(ReasoningBase):
             llm_output = self.llm(
                 messages=[
                     {"role": "system", "content": task_description},
-                    {"role": "assistant", "content": reasoning_process},
+                    {"role": "assistant", "content": str(reasoning_process)},
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
@@ -433,7 +433,7 @@ class RecReasoning(ReasoningBase):
             """
         }
 
-        final_assistant = {"role": "assistant", "content": reasoning_process}
+        final_assistant = {"role": "assistant", "content": str(reasoning_process)}
 
         final_user = {
             "role": "user",
