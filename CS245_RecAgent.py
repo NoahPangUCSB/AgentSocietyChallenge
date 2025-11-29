@@ -677,7 +677,7 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     task_set = "yelp"  # "goodreads" or "yelp"
-    num_tasks = 2      # adjust if you want more
+    num_tasks = None      # adjust if you want more
 
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
