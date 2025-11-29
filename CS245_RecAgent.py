@@ -542,10 +542,13 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         simulation_config = {
             "num_candidate_plans": 1,
+            "max_reasoning_tokens": 8192,
+            "max_planning_tokens": 2048,
         }
 
         self.planning.num_candidate_plans = simulation_config["num_candidate_plans"]
-        
+        self.reasoning.max_tokens = simulation_config["max_reasoning_tokens"]
+        self.planning.max_tokens = simulation_config["max_planning_tokens"]
         # --- PLANNING: multi-plan + selection, with global feedback ---
 
         plan_task_description = f"""
