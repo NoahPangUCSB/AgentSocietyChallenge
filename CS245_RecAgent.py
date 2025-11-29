@@ -399,6 +399,7 @@ class RecReasoning(ReasoningBase):
             print("Sub-task:", step['description'])
             llm_output = self.llm(
                 messages=[
+                    {"role": "assistant", "content": str(reasoning_process)},
                     {"role": "system", "content": task_description},
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
