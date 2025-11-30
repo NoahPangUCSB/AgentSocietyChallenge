@@ -10,8 +10,8 @@ from websocietysimulator.agent.modules.tooluse_modules import ToolUseToolFormer
 import re
 import logging
 import time
-import torch
 import os
+from dotenv import load_dotenv
 
 
 
@@ -397,18 +397,20 @@ class RecReasoning(ReasoningBase):
     def __call__(self, user, items, task_description: str, plan: list[dict]):
         """Override the parent class's __call__ method"""
         reasoning_process = {}
+        reasoning_result = "[]"
         for step in plan:
             print("Sub-task:", step['description'])
-            thinkingStrings = ['design', 'apply']
-            thinkingStep = any(thinkingString in step.get('description', '') for thinkingString in thinkingStrings)
+            # thinkingStrings = ['design', 'apply']
+            # thinkingStep = any(thinkingString in step.get('description', '') for thinkingString in thinkingStrings)
             llm_output = self.llm(
                 messages=[
-                    {"role": "assistant", "content": str(reasoning_process)},
+                    # {"role": "assistant", "content": str(reasoning_process)},
                     {"role": "system", "content": task_description},
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
-                max_tokens= self.max_tokens*2 if thinkingStep else self.max_tokens,
+                max_tokens=self.max_tokens,
+                # max_tokens= self.max_tokens*2 if thinkingStep else self.max_tokens,
                 response_format={"type": "json_object"},
             )
             print("LLM Output:", llm_output)
@@ -651,15 +653,14 @@ class RecommendationAgentCS245(RecommendationAgent):
 # =========================
 
 if __name__ == "__main__":
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-
     task_set = "yelp"  # "goodreads" or "yelp"
     num_tasks = 100     # adjust if you want more
 
+    # load_dotenv()
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+    # GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
     # -------- PHASE 1: initial run to gather feedback --------
@@ -671,7 +672,7 @@ if __name__ == "__main__":
     )
 
     simulator1.set_agent(RecommendationAgentCS245)
-    simulator1.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
+    simulator1.set_llm(OllamaLLM())  # or another LLMBase subclass
 
     agent_outputs_1 = simulator1.run_simulation(
         number_of_tasks=num_tasks, enable_threading=True, max_workers=10
