@@ -496,7 +496,7 @@ class RecReasoning(ReasoningBase):
             temperature=0.1,
             max_tokens=2048,
         )
-
+        print(f"Final ranking LLM output: {reasoning_result}")
         return reasoning_result
 
 
