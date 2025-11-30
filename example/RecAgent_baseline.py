@@ -12,7 +12,7 @@ import json
 from websocietysimulator import Simulator
 from websocietysimulator.agent import RecommendationAgent
 import tiktoken
-from websocietysimulator.llm import LLMBase, InfinigenceLLM, GeminiLLM
+from websocietysimulator.llm import LLMBase, InfinigenceLLM, GeminiLLM, OllamaLLM
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 import re
@@ -82,7 +82,7 @@ class RecReasoning(ReasoningBase):
         reasoning_result = self.llm(
             messages=messages,
             temperature=0.1,
-            max_tokens=8096
+            max_tokens=4096
         )
         print(reasoning_result)
         return reasoning_result
@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
     # Set LLM client
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-    simulator.set_llm(GeminiLLM(api_key=GEMINI_API_KEY))
+    simulator.set_llm(OllamaLLM())
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.
