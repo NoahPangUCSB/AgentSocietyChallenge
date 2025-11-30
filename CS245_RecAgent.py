@@ -414,15 +414,18 @@ class RecReasoning(ReasoningBase):
                 response_format={"type": "json_object"},
             )
             print("LLM Output:", llm_output)
-            action = json.loads(llm_output)
+            try:
+                action = json.loads(llm_output)
+            except:
+                action = llm_output
             reasoning_process[step['description']] = [action]
-            if 'action' in action and action['action'] in self.tools:
+            if isinstance(action, dict) and 'action' in action and action['action'] in self.tools:
                 tool_name = action['action']
                 tool_input = action['action_input']
                 tool_output = self.tools[tool_name]['function'](**tool_input)
                 print(f"Tool used: {tool_name}, Input: {tool_input}, Output: {tool_output}")
                 reasoning_process[step['description']].append(tool_output)
-            elif 'action' in action and action['action'] == 'FINISH':
+            elif isinstance(action, dict) and 'action' in action and action['action'] == 'FINISH':
                 reasoning_result = str(action.get('ranked_ids', '[]'))
                 print("Final answer reached.", reasoning_result)
                 break
