@@ -382,31 +382,144 @@ class RecPlanning(PlanningBase):
 
 
 # =========================
+#       MEMORY MODULE
+# =========================
+
+class RecMemory(MemoryBase):
+    def __init__(self, llm, top_k: int = 3, summary_max_tokens: int = 512,  max_score_retries: int = 3):
+        super().__init__(memory_type='generative', llm=llm)
+        self.top_k = top_k
+        self.summary_max_tokens = summary_max_tokens
+        self.max_score_retries = max_score_retries
+
+    def retriveMemory(self, query_scenario: str):
+        # Extract task name from query
+        task_name = query_scenario
+        
+        # Return empty if no memories exist
+        if self.scenario_memory._collection.count() == 0:
+            return ''
+            
+        # Get top 3 similar memories
+        similarity_results = self.scenario_memory.similarity_search_with_score(
+            task_name, k=self.top_k)
+            
+        fewshot_results = []
+        importance_scores = []
+
+        # Score each memory's relevance
+        for result in similarity_results:
+            trajectory = result[0].metadata['task_trajectory']
+            fewshot_results.append(trajectory)
+            
+            # Generate prompt to evaluate importance
+            prompt = f'''You will be given a successful case where a recommendation agent successfully complete a task. Then you will be given an ongoing task. Do not summarize these two cases, but rather evaluate how relevant and helpful the successful case is for the ongoing task, on a scale of 1-10. DO NOT output any reasonings.
+Success Case:
+{trajectory}
+Ongoing task:
+{query_scenario}
+Your output format should be exactly:
+Score: <integer between 1 and 10>
+'''         
+            score = 0 
+            # ---- RETRY LOOP HERE ----
+            for attempt in range(self.max_score_retries):
+                # Get importance score
+                try:
+                    response = self.llm(
+                        messages=[{"role": "user", "content": prompt}], 
+                        temperature=0.1, 
+                        stop_strs=['\n']
+                    )
+                except Exception:
+                    response = ""
+                
+                score = int(re.search(r'\d+', response).group()) if re.search(r'\d+', response) else 0
+                if 1 <= score <= 10:
+                    break
+            
+            importance_scores.append(score)
+
+        if not importance_scores:
+            return ""
+        
+        # Return trajectory with highest importance score
+        max_score_idx = importance_scores.index(max(importance_scores))
+        return similarity_results[max_score_idx][0].metadata['task_trajectory']
+    
+    def addMemory(self, current_situation: str, query_scenario: str):
+        # Extract task description
+        task_name = query_scenario or current_situation
+        
+        # Create document with metadata
+        memory_doc = Document(
+            page_content=task_name,
+            metadata={
+                "task_name": task_name,
+                "task_trajectory": current_situation
+            }
+        )
+        
+        # Add to memory store
+        try:
+            self.scenario_memory.add_documents([memory_doc])
+            logging.info("[RecMemory] Added new memory entry.")
+        except Exception as e:
+            logging.warning(f"[RecMemory] Failed to add memory: {e}")
+
+
+# =========================
 #      REASONING MODULE
 # =========================
 
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
 
-    def __init__(self, profile_type_prompt, llm, tools, max_tokens: int = 12288):
+    def __init__(self, profile_type_prompt, llm, tools, memory, max_tokens: int = 12288):
         """Initialize the reasoning module"""
-        super().__init__(profile_type_prompt=profile_type_prompt, memory=None, llm=llm)
+        super().__init__(profile_type_prompt=profile_type_prompt, memory=memory, llm=llm)
         self.tools = tools
         self.max_tokens = max_tokens
+        self.memory = memory
 
     def __call__(self, user, items, task_description: str, plan: list[dict]):
         """Override the parent class's __call__ method"""
         reasoning_process = {}
+
+        # Retrieve similar past trajectory
+        past_trajectory = ""
+        try:
+            query_scenario =  f"user_id: {user}, candidates: {items}"
+            past_trajectory = self.memory.retriveMemory(query_scenario)
+        except Exception as e:
+            logging.warning(f"[RecReasoning] Memory retrieval failed: {e}")
+            past_trajectory = ""
+        memory_prompt = ""
+        if past_trajectory:
+            memory_prompt = (
+                "Here is a previous successful trajectory for a similar task: \n"
+                + past_trajectory
+                + "\n\n"
+            )
+            
         for step in plan:
             print("Sub-task:", step['description'])
             thinkingStrings = ['design', 'apply']
             thinkingStep = any(thinkingString in step.get('description', '') for thinkingString in thinkingStrings)
+            messages = [
+                {"role": "assistant", "content": str(reasoning_process)}
+            ]
+            messages.append({"role": "system", "content": task_description})
+            if memory_prompt:
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": "Relevant past experience:\n" + memory_prompt,
+                    }
+                )
+            messages.append({"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')})
             llm_output = self.llm(
-                messages=[
-                    {"role": "assistant", "content": str(reasoning_process)},
-                    {"role": "system", "content": task_description},
-                    {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
-                ],
+                messages=messages,
                 temperature=0.1,
                 max_tokens= self.max_tokens*2 if thinkingStep else self.max_tokens,
                 response_format={"type": "json_object"},
@@ -423,34 +536,26 @@ class RecReasoning(ReasoningBase):
             elif 'action' in action and action['action'] == 'FINISH':
                 reasoning_result = str(action.get('ranked_ids', '[]'))
                 print("Final answer reached.", reasoning_result)
+
+                try:
+                    current_situation = (
+                        f"Task description:\n{task_description}\n\n"
+                        f"User: {user}\n"
+                        f"Candidate items: {items}\n"
+                        f"Plan: {plan}\n\n"
+                        f"Reasoning process: {reasoning_process}\n\n"
+                        f"Final ranked_ids: {reasoning_result}\n"
+                    )
+                    query_scenario = f"user_id: {user}, candidates: {items}"
+                    self.memory.addMemory(
+                        current_situation=current_situation,
+                        query_scenario=query_scenario,
+                    )
+                except Exception as e:
+                    logging.warning("[RecReasoning] Failed to add memory!")
                 break
         
         return reasoning_result
-
-
-# =========================
-#       MEMORY MODULE
-# =========================
-
-class RecMemory(MemoryBase):
-    def __init__(self, llm):
-        super().__init__(memory_type='recall', llm=llm)
-
-    def retriveMemory(self, query_scenario: str):
-        task_name = query_scenario
-
-        if self.scenario_memory._collection.count() == 0:
-            return ''
-
-        similarity_results = self.scenario_memory.similarity_search_with_score(
-            task_name, k=1
-        )
-
-        task_trajectories = [
-            result[0].metadata['task_trajectory'] for result in similarity_results
-        ]
-
-        return '\n'.join(task_trajectories)
 
 
 # =========================
@@ -465,6 +570,7 @@ class RecommendationAgentCS245(RecommendationAgent):
         super().__init__(llm=llm)
         # each agent instance reads the current global feedback
         self.global_feedback = RecommendationAgentCS245.GLOBAL_FEEDBACK
+        self.memory = RecMemory(llm=llm)
         self.planning = RecPlanning(llm=self.llm)
         self.tools = {}
         self.reasoning: RecReasoning | None = None
@@ -499,7 +605,7 @@ class RecommendationAgentCS245(RecommendationAgent):
             },
         }
         self.reasoning = RecReasoning(
-            profile_type_prompt='', llm=self.llm, tools=self.tools
+            profile_type_prompt='', llm=self.llm, tools=self.tools, memory=self.memory
         )
 
     def workflow(self) -> list[dict[str, any]]:
@@ -533,11 +639,27 @@ class RecommendationAgentCS245(RecommendationAgent):
           4) how to design a ranking method based on this information,
           5) how to apply the ranking method to produce a ranked list.
         """
+
+        few_shot_memory = ""
+        try: 
+            query_scenario = (
+                f"user_id: {user_id}, candidates: {candidate_list}"
+            )
+            past_trajectory = self.memory.retriveMemory(query_scenario)
+            if past_trajectory:
+                few_shot_memory = (
+                    "Here is a previous successful trajectory for a similar recommendation task:\n"
+                    + past_trajectory
+                )
+        except Exception as e:
+            logging.warning("[Agent] Memory retrieval for planning failed!")
+            few_shot_memory = ""
+        
         plan = self.planning(
             task_type='Recommendation Task',
             task_description=plan_task_description,
             feedback=self.global_feedback,
-            few_shot='',
+            few_shot=few_shot_memory,
         )
         print("Generated plan:", plan)
 
