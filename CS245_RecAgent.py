@@ -471,7 +471,7 @@ class RecReasoning(ReasoningBase):
             messages=[
                 {
                     "role": "assistant",
-                    "content": ({json.dumps(reasoning_process)})
+                    "content": (json.dumps(reasoning_process))
                 },
                 {
                     "role": "system",
