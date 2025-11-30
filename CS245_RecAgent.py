@@ -726,7 +726,7 @@ if __name__ == "__main__":
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-    simulator.set_llm(OllamaLLM())
+    simulator.set_llm(OllamaLLM(model="qwen2.5"))
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.
