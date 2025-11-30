@@ -404,7 +404,7 @@ class RecReasoning(ReasoningBase):
             # thinkingStep = any(thinkingString in step.get('description', '') for thinkingString in thinkingStrings)
             llm_output = self.llm(
                 messages=[
-                    # {"role": "assistant", "content": str(reasoning_process)},
+                    {"role": "assistant", "content": str(reasoning_process)},
                     {"role": "system", "content": task_description},
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
