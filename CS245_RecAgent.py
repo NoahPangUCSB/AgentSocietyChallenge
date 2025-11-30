@@ -655,7 +655,7 @@ if __name__ == "__main__":
 
 
     task_set = "yelp"  # "goodreads" or "yelp"
-    num_tasks = 1     # adjust if you want more
+    num_tasks = 100     # adjust if you want more
 
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -671,7 +671,7 @@ if __name__ == "__main__":
     )
 
     simulator1.set_agent(RecommendationAgentCS245)
-    simulator1.set_llm(OllamaLLM(model="qwen2.5"))  # or another LLMBase subclass
+    simulator1.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
 
     agent_outputs_1 = simulator1.run_simulation(
         number_of_tasks=num_tasks, enable_threading=True, max_workers=10
