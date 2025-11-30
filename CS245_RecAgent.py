@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from websocietysimulator import Simulator
 from websocietysimulator.agent import RecommendationAgent
 import tiktoken
-from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, DeepseekLLM, OllamaLLM
+from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, DeepseekLLM, OllamaLLM, GeminiLLM
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
 from websocietysimulator.agent.modules.memory_modules import MemoryBase
@@ -726,7 +726,8 @@ if __name__ == "__main__":
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-    simulator.set_llm(OllamaLLM(model="qwen2.5"))
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    simulator.set_llm(GeminiLLM(api_key=GEMINI_API_KEY))
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.
