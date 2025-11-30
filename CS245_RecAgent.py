@@ -655,7 +655,7 @@ if __name__ == "__main__":
 
 
     task_set = "yelp"  # "goodreads" or "yelp"
-    num_tasks = None      # adjust if you want more
+    num_tasks = 1     # adjust if you want more
 
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -671,7 +671,7 @@ if __name__ == "__main__":
     )
 
     simulator1.set_agent(RecommendationAgentCS245)
-    simulator1.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
+    simulator1.set_llm(OllamaLLM(model="qwen2.5"))  # or another LLMBase subclass
 
     agent_outputs_1 = simulator1.run_simulation(
         number_of_tasks=num_tasks, enable_threading=True, max_workers=10
@@ -696,21 +696,21 @@ if __name__ == "__main__":
 
     # -------- PHASE 2: refined planning and final evaluation --------
 
-    simulator2 = Simulator(data_dir="processed_datasets", device="auto", cache=True)
-    simulator2.set_task_and_groundtruth(
-        task_dir=f"./example/track2/{task_set}/tasks",
-        groundtruth_dir=f"./example/track2/{task_set}/groundtruth",
-    )
+    # simulator2 = Simulator(data_dir="processed_datasets", device="auto", cache=True)
+    # simulator2.set_task_and_groundtruth(
+    #     task_dir=f"./example/track2/{task_set}/tasks",
+    #     groundtruth_dir=f"./example/track2/{task_set}/groundtruth",
+    # )
 
-    simulator2.set_agent(RecommendationAgentCS245)
-    simulator2.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
+    # simulator2.set_agent(RecommendationAgentCS245)
+    # simulator2.set_llm(GeminiLLM(GEMINI_API_KEY))  # or another LLMBase subclass
 
-    agent_outputs_2 = simulator2.run_simulation(
-        number_of_tasks=num_tasks, enable_threading=True, max_workers=10
-    )
+    # agent_outputs_2 = simulator2.run_simulation(
+    #     number_of_tasks=num_tasks, enable_threading=True, max_workers=10
+    # )
 
-    evaluation_results_2 = simulator2.evaluate()
-    with open(f'./evaluation_results_track2_{task_set}_phase2.json', 'w') as f:
-        json.dump(evaluation_results_2, f, indent=4)
+    # evaluation_results_2 = simulator2.evaluate()
+    # with open(f'./evaluation_results_track2_{task_set}_phase2.json', 'w') as f:
+    #     json.dump(evaluation_results_2, f, indent=4)
 
-    print(f"[PHASE 2] evaluation_results: {evaluation_results_2}")
+    # print(f"[PHASE 2] evaluation_results: {evaluation_results_2}")
