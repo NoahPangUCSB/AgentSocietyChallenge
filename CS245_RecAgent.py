@@ -252,6 +252,12 @@ Return ONLY valid JSON using this schema:
       "params": {"user_id": "{{user_id}}"},
       "reasoning_instruction": "string",
       "description": "string (optional)"
+    },
+    {
+      "type": "FETCH_ITEMS",
+      "params": {"item_ids": ["item1", "item2", ...]},
+      "reasoning_instruction": "string",
+      "description": "string (optional)"
     }
   ]
 }
@@ -464,9 +470,14 @@ class RecReasoning(ReasoningBase):
         reasoning_result = self.llm(
             messages=[
                 {
+                    "role": "assistant",
+                    "content": ({json.dumps(reasoning_process)})
+                },
+                {
                     "role": "system",
                     "content": (
-                        "You are a recommendation agent. Output ONLY strict JSON:\n"
+                        "You are a recommendation agent. Consider the user's preferences and how they relate to the candidate items given to rank the candidate items." 
+                        "Output ONLY strict JSON:\n"
                         "{\"ranked_ids\": [\"id1\", \"id2\", ...]}\n"
                         "ranked_ids must contain ONLY the provided candidate item ids, each exactly once."
                     ),
@@ -483,7 +494,7 @@ class RecReasoning(ReasoningBase):
                 },
             ],
             temperature=0.1,
-            max_tokens=800,
+            max_tokens=2048,
         )
 
         return reasoning_result

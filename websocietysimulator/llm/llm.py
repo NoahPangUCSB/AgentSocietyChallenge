@@ -89,7 +89,7 @@ class OllamaLLM(LLMBase):
                 n=n,
                 response_format=response_format
             )
-            
+            print(f"Finish Reason: {response.choices[0].finish_reason}")
             if n == 1:
                 return response.choices[0].message.content
             else:
