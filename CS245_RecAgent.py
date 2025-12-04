@@ -442,8 +442,8 @@ class RecReasoning(ReasoningBase):
         print("Memory:", memory_prompt)
         for step in plan:
             print("Sub-task:", step['description'])
-            # thinkingStrings = ['design', 'apply']
-            # thinkingStep = any(thinkingString in step.get('description', '') for thinkingString in thinkingStrings)
+            thinkingStrings = ['design', 'apply', 'method', 'rank']
+            thinkingStep = any(thinkingString in step.get('description', '') for thinkingString in thinkingStrings)
             llm_output = self.llm(
                 messages=[
                     {"role": "assistant", "content": str(reasoning_process) + '\n' + memory_prompt},
@@ -451,8 +451,8 @@ class RecReasoning(ReasoningBase):
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
-                max_tokens=self.max_tokens,
-                # max_tokens= self.max_tokens*2 if thinkingStep else self.max_tokens,
+                # max_tokens=self.max_tokens,
+                max_tokens=self.max_tokens*2 if thinkingStep else self.max_tokens,
                 response_format={"type": "json_object"},
             )
             print("LLM Output:", llm_output)
@@ -545,7 +545,7 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         simulation_config = {
             "num_candidate_plans": 1,
-            "max_reasoning_tokens": 8192,
+            "max_reasoning_tokens": 4096,
             "max_planning_tokens": 1024,
         }
 
@@ -726,7 +726,8 @@ if __name__ == "__main__":
 
     tasks = simulator1.tasks[:num_tasks]
     groundtruths = [gt['ground truth'] for gt in simulator1.groundtruth_data]
-    llm = GeminiLLM(api_key=GEMINI_API_KEY)
+    # llm = GeminiLLM(api_key=GEMINI_API_KEY)
+    llm = OllamaLLM(model_name="deepseek-r1")  # Example for local Ollama server
     memory = RecMemory(llm=llm)
     agent = RecommendationAgentCS245(llm=llm, memory=memory)
     evaluator = RecommendationEvaluator()
