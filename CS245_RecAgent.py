@@ -5,12 +5,16 @@ import tiktoken
 from websocietysimulator.llm import LLMBase, InfinigenceLLM, OpenAILLM, DeepseekLLM, OllamaLLM, GeminiLLM
 from websocietysimulator.agent.modules.planning_modules import PlanningBase
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
-from websocietysimulator.agent.modules.memory_modules import MemoryBase
+from websocietysimulator.agent.modules.memory_modules import MemoryBase, MemoryDILU
 from websocietysimulator.agent.modules.tooluse_modules import ToolUseToolFormer
+from websocietysimulator.tools.evaluation_tool import RecommendationEvaluator
+from langchain_core.documents import Document
 import re
+import ast
 import logging
 import time
 import os
+import logging
 from dotenv import load_dotenv
 
 
@@ -380,6 +384,39 @@ class RecPlanning(PlanningBase):
             },
         ]
 
+# =========================
+#       MEMORY MODULE
+# =========================
+
+class RecMemory(MemoryBase):
+    def __init__(self, llm):
+        super().__init__(memory_type='recall', llm=llm)
+
+    def retriveMemory(self, query_scenario: str):
+        task_name = query_scenario
+
+        if self.scenario_memory._collection.count() == 0:
+            return ''
+
+        similarity_results = self.scenario_memory.similarity_search_with_score(
+            task_name, k=1
+        )
+
+        task_trajectories = [
+            f'{result[0].page_content} \n {str(result[0].metadata)}' for result in similarity_results
+        ]
+
+        return '\n'.join(task_trajectories)
+    
+    def addMemory(self, page_content: str, metadata: dict):
+        # Create document with metadata
+        memory_doc = Document(
+            page_content=page_content,
+            metadata=metadata
+        )
+        
+        # Add to memory store
+        self.scenario_memory.add_documents([memory_doc])
 
 # =========================
 #      REASONING MODULE
@@ -388,9 +425,9 @@ class RecPlanning(PlanningBase):
 class RecReasoning(ReasoningBase):
     """Inherits from ReasoningBase"""
 
-    def __init__(self, profile_type_prompt, llm, tools, max_tokens: int = 12288):
+    def __init__(self, profile_type_prompt, llm, tools, max_tokens: int = 12288, memory: RecMemory = None):
         """Initialize the reasoning module"""
-        super().__init__(profile_type_prompt=profile_type_prompt, memory=None, llm=llm)
+        super().__init__(profile_type_prompt=profile_type_prompt, memory=memory, llm=llm)
         self.tools = tools
         self.max_tokens = max_tokens
 
@@ -398,13 +435,18 @@ class RecReasoning(ReasoningBase):
         """Override the parent class's __call__ method"""
         reasoning_process = {}
         reasoning_result = "[]"
+
+        memory_query = {"user": user, "items": items}
+        memory = self.memory.retriveMemory(json.dumps(memory_query)) if self.memory else ''
+        memory_prompt = f"Here is relevant memory from past task(s) to help improve your reasoning:\n{memory}\n" if memory else ''
+        print("Memory:", memory_prompt)
         for step in plan:
             print("Sub-task:", step['description'])
             # thinkingStrings = ['design', 'apply']
             # thinkingStep = any(thinkingString in step.get('description', '') for thinkingString in thinkingStrings)
             llm_output = self.llm(
                 messages=[
-                    {"role": "assistant", "content": str(reasoning_process)},
+                    {"role": "assistant", "content": str(reasoning_process) + '\n' + memory_prompt},
                     {"role": "system", "content": task_description},
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
@@ -429,34 +471,23 @@ class RecReasoning(ReasoningBase):
                 reasoning_result = str(action.get('ranked_ids', '[]'))
                 print("Final answer reached.", reasoning_result)
                 break
-        
-        return reasoning_result
-
-
-# =========================
-#       MEMORY MODULE
-# =========================
-
-class RecMemory(MemoryBase):
-    def __init__(self, llm):
-        super().__init__(memory_type='recall', llm=llm)
-
-    def retriveMemory(self, query_scenario: str):
-        task_name = query_scenario
-
-        if self.scenario_memory._collection.count() == 0:
-            return ''
-
-        similarity_results = self.scenario_memory.similarity_search_with_score(
-            task_name, k=1
-        )
-
-        task_trajectories = [
-            result[0].metadata['task_trajectory'] for result in similarity_results
-        ]
-
-        return '\n'.join(task_trajectories)
-
+        summary = self.summarize_trajectory(json.dumps(reasoning_process))
+        return {"result": reasoning_result, "summary": summary}
+    
+    def summarize_trajectory(self, trajectory: str):
+        summary_prompt = f"""
+        You are summarizing an agent's recommendation task trajectory. Write a concise summary highlighting key actions taken and decisions made.
+        Your summary should include:
+          - Major steps the agent took (e.g., gathering user/item/review info, designing ranking method)
+          - What user preferences were inferred
+          - What ranking strategy was used
+          The summary should be at most 4 consice sentences.
+          Here is the trajectory:
+          {trajectory}
+          Now output the summary:
+        """
+        summary = self.llm(messages=[{"role": "user", "content": summary_prompt}], temperature=0.1, max_tokens=512)
+        return summary.strip()
 
 # =========================
 #      RECOMMENDATION AGENT
@@ -466,13 +497,14 @@ class RecommendationAgentCS245(RecommendationAgent):
     # Global feedback shared across agent instances (global refinement)
     GLOBAL_FEEDBACK: str = ""
 
-    def __init__(self, llm: LLMBase):
+    def __init__(self, llm: LLMBase, memory: RecMemory = None):
         super().__init__(llm=llm)
         # each agent instance reads the current global feedback
         self.global_feedback = RecommendationAgentCS245.GLOBAL_FEEDBACK
         self.planning = RecPlanning(llm=self.llm)
         self.tools = {}
         self.reasoning: RecReasoning | None = None
+        self.memory = memory
 
     def set_interaction_tool(self, interaction_tool):
         super().set_interaction_tool(interaction_tool)
@@ -504,7 +536,7 @@ class RecommendationAgentCS245(RecommendationAgent):
             },
         }
         self.reasoning = RecReasoning(
-            profile_type_prompt='', llm=self.llm, tools=self.tools
+            profile_type_prompt='', llm=self.llm, tools=self.tools, memory=self.memory
         )
 
     def workflow(self) -> list[dict[str, any]]:
@@ -513,7 +545,7 @@ class RecommendationAgentCS245(RecommendationAgent):
 
         simulation_config = {
             "num_candidate_plans": 1,
-            "max_reasoning_tokens": 4096,
+            "max_reasoning_tokens": 8192,
             "max_planning_tokens": 1024,
         }
 
@@ -629,26 +661,44 @@ class RecommendationAgentCS245(RecommendationAgent):
             task_description=reasoning_task_description,
         )
 
+        # Parse result, get summary for memory
+        summary = result.get('summary', '')
+        result = str(result.get('result', '[]'))
+
         print("candidate list: ", candidate_list)
-        print("result: ", result)
+        print("result: ", result, type(result))
         print("item_list: ", item_list)
         print("history_review: ", history_review)
         print("user: ", user)
-
         # --- POST-PROCESSING OF LLM OUTPUT ---
-
+        parsed_result = None
         try:
             match = re.search(r"\[.*\]", result, re.DOTALL)
             if match:
+                print("List found in result.", match)
                 result_list_str = match.group()
             else:
                 print("No list found.")
                 return ['']
-            print('Processed Output:', eval(result_list_str))
-            return eval(result_list_str)
-        except Exception:
-            print('format error')
-            return ['']
+            try:
+                processed = ast.literal_eval(result_list_str)
+                print('Processed Output:', processed)
+                parsed_result = processed
+            except Exception:
+                print('literal_eval failed, falling back to eval')
+                parsed_result = eval(result_list_str)
+        except Exception as e:
+            print('format error', e)
+            parsed_result = ['']
+        
+        # Collect metadata and summary for memory
+        metadata = {
+            "user_id": str(user_id),
+            "candidate_list": str(candidate_list),
+            "final_ranking": str(parsed_result),
+        }
+
+        return {"result": parsed_result, "metadata": metadata, "page_content": summary}
 
 
 # =========================
@@ -657,31 +707,80 @@ class RecommendationAgentCS245(RecommendationAgent):
 
 if __name__ == "__main__":
     task_set = "yelp"  # "goodreads" or "yelp"
-    num_tasks = 100     # adjust if you want more
+    num_tasks = 25     # adjust if you want more
 
-    # load_dotenv()
+    load_dotenv()
     HF_TOKEN = os.environ.get("HF_TOKEN")
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-    # GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    # GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
     # -------- PHASE 1: initial run to gather feedback --------
-
+    # setup
     simulator1 = Simulator(data_dir="processed_datasets", device="auto", cache=True)
     simulator1.set_task_and_groundtruth(
         task_dir=f"./example/track2/{task_set}/tasks",
         groundtruth_dir=f"./example/track2/{task_set}/groundtruth",
     )
 
-    simulator1.set_agent(RecommendationAgentCS245)
-    simulator1.set_llm(OllamaLLM())  # or another LLMBase subclass
+    tasks = simulator1.tasks[:num_tasks]
+    groundtruths = [gt['ground truth'] for gt in simulator1.groundtruth_data]
+    llm = GeminiLLM(api_key=GEMINI_API_KEY)
+    memory = RecMemory(llm=llm)
+    agent = RecommendationAgentCS245(llm=llm, memory=memory)
+    evaluator = RecommendationEvaluator()
+    logger = logging.getLogger("websocietysimulator")
 
-    agent_outputs_1 = simulator1.run_simulation(
-        number_of_tasks=num_tasks, enable_threading=True, max_workers=10
+    predictions = []
+    # run tasks one by one to gather memory
+    for i in range(len(tasks)):
+        task = tasks[i]
+        groundtruth = groundtruths[i]
+        agent.set_interaction_tool(simulator1.interaction_tool)
+        agent.insert_task(task)
+        output = {}
+        try:
+            output = agent.workflow()
+            # set up memory
+            evaluation = evaluator.calculate_hr_at_n(
+                ground_truth=[groundtruth],
+                predictions=[output.get('result', [])],
+            )
+            metadata = output.get('metadata', {})
+            metadata['evaluation'] = str(evaluation)
+            print("Agent output:", output)
+            print(f"Evaluation for task {i}:", evaluation)
+            memory.addMemory(page_content=output.get('summary', ''), metadata=metadata)
+            logger.info(f"Simulation finished for task {i}")
+        except Exception as e:
+            logger.error(f"Task {i} failed with error: {str(e)}")
+        
+        # add output for final evaluation
+        predictions.append(output.get('result', []))
+    
+    logger.info("Simulation finished")
+
+
+    # simulator1.set_agent(RecommendationAgentCS245)
+    # simulator1.set_llm(GeminiLLM(api_key=GEMINI_API_KEY))  # or another LLMBase subclass
+
+    # agent_outputs_1 = simulator1.run_simulation(
+    #     number_of_tasks=num_tasks, enable_threading=True, max_workers=10
+    # )
+
+    # evaluation_results_1 = simulator1.evaluate()
+    evaluation_results_1 = evaluator.calculate_hr_at_n(
+        ground_truth=groundtruths[:num_tasks],
+        predictions=predictions,
     )
-
-    evaluation_results_1 = simulator1.evaluate()
+    evaluation_results_1 = {'type': 'recommendation', 'results': evaluation_results_1.__dict__}
+    evaluation_results_1['data_info'] = {
+            'evaluated_count': min(num_tasks, len(groundtruths)),
+            'original_simulation_count': num_tasks,
+            'original_ground_truth_count': len(groundtruths)
+    }
+        
     with open(f'./evaluation_results_track2_{task_set}_phase1.json', 'w') as f:
         json.dump(evaluation_results_1, f, indent=4)
 

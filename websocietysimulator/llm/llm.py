@@ -5,6 +5,7 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_i
 from .infinigence_embeddings import InfinigenceEmbeddings
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import logging
+from langchain_huggingface import HuggingFaceEmbeddings
 logger = logging.getLogger("websocietysimulator")
 
 class LLMBase:
@@ -53,11 +54,10 @@ class OllamaLLM(LLMBase):
         """
         super().__init__(model)
         self.client = OpenAI(
-            api_key="ollama", # Required by client but ignored by Ollama
-            base_url="http://127.0.0.1:11434/v1" # Points to your local machine
+            api_key="ollama",
+            base_url="http://127.0.0.1:11434/v1"
         )
-        # Ollama does support embeddings, but often requires a specific model (e.g., 'nomic-embed-text').
-        # Setting to None for now to match your other classes.
+ 
         self.embedding_model = None 
         
     @retry(
@@ -115,7 +115,6 @@ class GeminiLLM(LLMBase):
         """
         super().__init__(model)
 
-        # IMPORTANT ↓↓↓
         self.client = OpenAI(
             api_key=api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -162,17 +161,8 @@ class GeminiLLM(LLMBase):
     # Embeddings
     # -------------------------
     def get_embedding_model(self):
-        return self
+        return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     
-    def embed(self, text: str):
-        """
-        Create embeddings using Gemini's embedding model
-        """
-        res = self.client.embeddings.create(
-            model=self.embedding_model_name,
-            input=text
-        )
-        return res.data[0].embedding
 class DeepseekLLM(LLMBase):
     def __init__(self, api_key: str, model: str = "deepseek-chat"):
         """
