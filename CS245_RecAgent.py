@@ -727,7 +727,7 @@ if __name__ == "__main__":
     tasks = simulator1.tasks[:num_tasks]
     groundtruths = [gt['ground truth'] for gt in simulator1.groundtruth_data]
     # llm = GeminiLLM(api_key=GEMINI_API_KEY)
-    llm = OllamaLLM(model_name="deepseek-r1")  # Example for local Ollama server
+    llm = OllamaLLM(model="deepseek-r1")  # Example for local Ollama server
     memory = RecMemory(llm=llm)
     agent = RecommendationAgentCS245(llm=llm, memory=memory)
     evaluator = RecommendationEvaluator()
