@@ -714,8 +714,8 @@ def run_experiments():
             "task_set": ["yelp"],
             "num_tasks": [50],
             "model": ["gemini-2.5-flash-lite"],
-            "num_candidate_plans": [0, 1, 3],
-            "use_plan": [True, False],
+            "num_candidate_plans": [0],
+            "use_plan": [False],
             "extra_thinking_tokens": [True, False],
             "memory": [True, False]
         }
@@ -746,6 +746,7 @@ def run_experiments():
                         for use_plan in config["use_plan"]:
                             for extra_thinking_tokens in config["extra_thinking_tokens"]:
                                 for memory_enabled in config["memory"]:
+                                    orig_stdout = sys.stdout  # Save original stdout
                                     f = open(f'task_set={task_set}-num_tasks={num_task}-model={model_name}-num_candidate_plans={num_candidate_plans}-use_plan={use_plan}-extra_thinking_tokens={extra_thinking_tokens}-memory={memory_enabled}', 'w')
                                     sys.stdout = f  # Redirect stdout to the file
 
@@ -809,6 +810,7 @@ def run_experiments():
                                     experiment_end_time = time.time()
                                     print(f"Experiment completed in {experiment_end_time - experiment_start_time} seconds.")
                                     f.close()
+                                    sys.stdout = orig_stdout  # Reset stdout to original
                                     logger.info(f"Experiment completed in {experiment_end_time - experiment_start_time} seconds.")
     total_experiment_end_time = time.time()
     print(f"All experiments completed in {total_experiment_end_time - total_experiment_start_time} seconds.")

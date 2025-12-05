@@ -106,7 +106,7 @@ class OllamaLLM(LLMBase):
             raise e
     
     def get_embedding_model(self):
-        return self.embedding_model
+        return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 class GeminiLLM(LLMBase):
     def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
