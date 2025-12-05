@@ -1,5 +1,6 @@
 import sys
 import os
+from dotenv import load_dotenv
 
 # Get the path to the directory "one level up"
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -183,8 +184,10 @@ if __name__ == "__main__":
     simulator.set_agent(MyRecommendationAgent)
 
     # Set LLM client
-    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-    simulator.set_llm(OllamaLLM())
+    # GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    load_dotenv()
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    simulator.set_llm(GeminiLLM(api_key=GEMINI_API_KEY, model="gemini-2.5-flash-lite"))
 
     # Run evaluation
     # If you don't set the number of tasks, the simulator will run all tasks.

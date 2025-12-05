@@ -15,6 +15,7 @@ import logging
 import time
 import os
 import logging
+import sys
 from dotenv import load_dotenv
 
 
@@ -431,7 +432,7 @@ class RecReasoning(ReasoningBase):
         self.tools = tools
         self.max_tokens = max_tokens
 
-    def __call__(self, user, items, task_description: str, plan: list[dict]):
+    def __call__(self, user, items, task_description: str, plan: list[dict], extra_thinking_tokens: bool = True):
         """Override the parent class's __call__ method"""
         reasoning_process = {}
         reasoning_result = "[]"
@@ -451,8 +452,7 @@ class RecReasoning(ReasoningBase):
                     {"role": "user", "content": step.get('description', '') + '\n' + step.get('reasoning_instruction', '')},
                 ],
                 temperature=0.1,
-                # max_tokens=self.max_tokens,
-                max_tokens=self.max_tokens*2 if thinkingStep else self.max_tokens,
+                max_tokens=self.max_tokens*2 if thinkingStep and extra_thinking_tokens else self.max_tokens,
                 response_format={"type": "json_object"},
             )
             print("LLM Output:", llm_output)
@@ -539,12 +539,12 @@ class RecommendationAgentCS245(RecommendationAgent):
             profile_type_prompt='', llm=self.llm, tools=self.tools, memory=self.memory
         )
 
-    def workflow(self) -> list[dict[str, any]]:
+    def workflow(self, n_candidate_plans=1, use_plan=True, extra_thinking_tokens=True) -> list[dict[str, any]]:
         user_id = self.task['user_id']
         candidate_list = self.task['candidate_list']
 
         simulation_config = {
-            "num_candidate_plans": 1,
+            "num_candidate_plans": n_candidate_plans,
             "max_reasoning_tokens": 4096,
             "max_planning_tokens": 1024,
         }
@@ -570,16 +570,20 @@ class RecommendationAgentCS245(RecommendationAgent):
           4) how to design a ranking method based on this information,
           5) how to apply the ranking method to produce a ranked list.
         """
-        plan = self.planning(
-            task_type='Recommendation Task',
-            task_description=plan_task_description,
-            feedback=self.global_feedback,
-            few_shot='',
-        )
+        if (use_plan):
+            plan = self.planning(
+                task_type='Recommendation Task',
+                task_description=plan_task_description,
+                feedback=self.global_feedback,
+                few_shot='',
+            )
+        else:
+            plan = [{
+                  "description": "I need to apply a ranking method to produce the final ranked list"
+                }]
         print("Generated plan:", plan)
 
-        # --- INFORMATION GATHERING BASED ON PLAN ---
-
+        # --- INFORMATION GATHERING BASED ON PLAN (Note: not currently using, have reasoning module call tools)---
         user = ''
         item_list = []
         history_review = ''
@@ -629,6 +633,7 @@ class RecommendationAgentCS245(RecommendationAgent):
             else:
                 # ranking / meta steps, no environment calls here
                 pass
+        
 
         # --- TASK DESCRIPTION FOR FINAL REASONING / RANKING ---
 
@@ -659,6 +664,7 @@ class RecommendationAgentCS245(RecommendationAgent):
             items=candidate_list,
             plan=plan,
             task_description=reasoning_task_description,
+            extra_thinking_tokens=extra_thinking_tokens,
         )
 
         # Parse result, get summary for memory
@@ -696,9 +702,117 @@ class RecommendationAgentCS245(RecommendationAgent):
             "user_id": str(user_id),
             "candidate_list": str(candidate_list),
             "final_ranking": str(parsed_result),
+            "summary": summary,
         }
 
         return {"result": parsed_result, "metadata": metadata, "page_content": summary}
+
+def run_experiments():
+    # Baseline max_tokens for reasoning: 4096, for planning: 1024
+    experment_configs = [
+        {
+            "task_set": ["yelp"],
+            "num_tasks": [50],
+            "model": ["gemini-2.5-flash-lite"],
+            "num_candidate_plans": [0, 1, 3],
+            "use_plan": [True, False],
+            "extra_thinking_tokens": [True, False],
+            "memory": [True, False]
+        }
+    ]    
+
+    # Setup
+    load_dotenv()
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    gemini_llm = GeminiLLM(api_key=GEMINI_API_KEY, model="gemini-2.5-flash-lite")
+    ollama_llm = OllamaLLM(model="llama3")
+    evaluator = RecommendationEvaluator()
+    logger = logging.getLogger("websocietysimulator")
+    # Use simulator to load data and tasks and groundtruths, but use own evaluation implementation for memory purposes
+    simulator = Simulator(data_dir="processed_datasets", device="auto", cache=True)
+    # Just use yelp for experiments
+    simulator.set_task_and_groundtruth(
+        task_dir=f"./example/track2/yelp/tasks",
+        groundtruth_dir=f"./example/track2/yelp/groundtruth",
+    )
+    # Get tasks and groundtruths
+    groundtruths = [gt['ground truth'] for gt in simulator.groundtruth_data]
+    total_experiment_start_time = time.time()
+    for config in experment_configs:
+        for task_set in config["task_set"]:
+            for num_task in config["num_tasks"]:
+                for model_name in config["model"]:
+                    for num_candidate_plans in config["num_candidate_plans"]:
+                        for use_plan in config["use_plan"]:
+                            for extra_thinking_tokens in config["extra_thinking_tokens"]:
+                                for memory_enabled in config["memory"]:
+                                    f = open(f'task_set={task_set}-num_tasks={num_task}-model={model_name}-num_candidate_plans={num_candidate_plans}-use_plan={use_plan}-extra_thinking_tokens={extra_thinking_tokens}-memory={memory_enabled}', 'w')
+                                    sys.stdout = f  # Redirect stdout to the file
+
+                                    print(f"Running experiment with config: task_set={task_set}, num_tasks={num_task}, model={model_name}, num_candidate_plans={num_candidate_plans}, use_plan={use_plan}, extra_thinking_tokens={extra_thinking_tokens}, memory={memory_enabled}")
+                                    experiment_start_time = time.time()
+                                    # Initialize LLM
+                                    llm = gemini_llm if model_name.startswith("gemini") else ollama_llm
+                                    # Initialize memory
+                                    memory = RecMemory(llm=llm) if memory_enabled else None
+                                    # Initialize agent
+                                    agent = RecommendationAgentCS245(llm=llm, memory=memory)
+                                    # Set tasks
+                                    tasks = simulator.tasks[:num_task]
+                                    # Run tasks and collect results
+                                    predictions = []
+                                    # run tasks one by one to gather memory
+                                    for i in range(len(tasks)):
+                                        task_start_time = time.time()
+                                        task = tasks[i]
+                                        groundtruth = groundtruths[i]
+                                        agent.set_interaction_tool(simulator.interaction_tool)
+                                        agent.insert_task(task)
+                                        output = {}
+                                        try:
+                                            output = agent.workflow(n_candidate_plans=num_candidate_plans, use_plan=use_plan, extra_thinking_tokens=extra_thinking_tokens)
+                                            # set up memory
+                                            evaluation = evaluator.calculate_hr_at_n(
+                                                ground_truth=[groundtruth],
+                                                predictions=[output.get('result', [])],
+                                            )
+                                            metadata = output.get('metadata', {})
+                                            metadata['evaluation'] = str(evaluation)
+                                            print("Agent output:", output)
+                                            print(f"Evaluation for task {i}:", evaluation)
+                                            if(memory_enabled):
+                                                memory.addMemory(page_content=output.get('summary', ''), metadata=metadata)
+                                            logger.info(f"Simulation finished for task {i}")
+                                        except Exception as e:
+                                            logger.error(f"Task {i} failed with error: {str(e)}")
+                                        
+                                        # add output for final evaluation
+                                        predictions.append(output.get('result', []))
+                                        task_end_time = time.time()
+                                        print(f"Task {i} completed in {task_end_time - task_start_time} seconds.")
+                                        logger.info(f"Task {i} completed in {task_end_time - task_start_time} seconds.")
+                                    
+                                    logger.info("Simulation finished")
+
+                                    evaluation_results_1 = evaluator.calculate_hr_at_n(
+                                        ground_truth=groundtruths[:num_task],
+                                        predictions=predictions,
+                                    )
+                                    evaluation_results_1 = {'type': 'recommendation', 'results': evaluation_results_1.__dict__}
+                                    evaluation_results_1['data_info'] = {
+                                            'evaluated_count': min(num_task, len(groundtruths)),
+                                            'original_simulation_count': num_task,
+                                            'original_ground_truth_count': len(groundtruths)
+                                    }
+
+                                    print(f"Evaluation_results: {evaluation_results_1}")
+                                    experiment_end_time = time.time()
+                                    print(f"Experiment completed in {experiment_end_time - experiment_start_time} seconds.")
+                                    f.close()
+                                    logger.info(f"Experiment completed in {experiment_end_time - experiment_start_time} seconds.")
+    total_experiment_end_time = time.time()
+    print(f"All experiments completed in {total_experiment_end_time - total_experiment_start_time} seconds.")
+
 
 
 # =========================
@@ -706,6 +820,8 @@ class RecommendationAgentCS245(RecommendationAgent):
 # =========================
 
 if __name__ == "__main__":
+    run_experiments()
+    '''
     task_set = "yelp"  # "goodreads" or "yelp"
     num_tasks = 25     # adjust if you want more
 
@@ -726,8 +842,8 @@ if __name__ == "__main__":
 
     tasks = simulator1.tasks[:num_tasks]
     groundtruths = [gt['ground truth'] for gt in simulator1.groundtruth_data]
-    # llm = GeminiLLM(api_key=GEMINI_API_KEY)
-    llm = OllamaLLM(model="deepseek-r1")  # Example for local Ollama server
+    llm = GeminiLLM(api_key=GEMINI_API_KEY, model="gemini-2.5-flash-lite")
+    # llm = OllamaLLM(model="gemma3")
     memory = RecMemory(llm=llm)
     agent = RecommendationAgentCS245(llm=llm, memory=memory)
     evaluator = RecommendationEvaluator()
@@ -818,3 +934,4 @@ if __name__ == "__main__":
     #     json.dump(evaluation_results_2, f, indent=4)
 
     # print(f"[PHASE 2] evaluation_results: {evaluation_results_2}")
+    '''
