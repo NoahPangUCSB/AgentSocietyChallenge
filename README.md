@@ -8,7 +8,7 @@
 [![Competition Link](https://img.shields.io/badge/competition-link-orange)](https://www.codabench.org/competitions/4574/) &ensp;
 [![arXiv](https://img.shields.io/badge/arXiv-2502.18754-b31b1b.svg)](https://arxiv.org/abs/2502.18754)
 
-This repository contains our custome LLM-based recommendation agent built for the **WWW'25 AgentSociety Challenge**. Our work focuses exclusively on the **Recommendation Track**, where the goal is to design agents that can generate high-quality, context-aware item recommendations in a simulated environment based on open-source datasets.
+This repository contains our custome LLM-based recommendation agent built for the **WWW'25 AgentSociety Challenge**. Our work focuses exclusively on the **Recommendation Track**, where the goal is to design agents that can generate high-quality, context-aware item recommendations in a simulated environment based on open-source datasets. We have 2 different implementations of the recommendation agents, see **CS245_RecAgent.py** and **CS245_RecAgent2.py**.
 
 ---
 
@@ -30,6 +30,12 @@ Contains usage examples of the `websocietysimulator` library. Includes sample ag
 
 ### 3. **`data_process.py`**  
 A script to process the raw Yelp dataset into the required format for use with the `websocietysimulator` library. This script ensures the dataset is cleaned and structured correctly for simulations.
+
+### 4. **`CS245_RecAgent.py`** 
+Main script to run our recommendation agent variant 1.
+
+### 5. **`CS245_RecAgent2.py`** 
+Main script to run our recommendation agent variant 2.
 
 ---
 
