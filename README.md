@@ -104,7 +104,8 @@ You can name the dataset directory whatever you prefer (e.g., `dataset/`).
 ---
 ### 4. Run our Recommendation Agent
 
-You can change configs in run_experiments() function for your own exploration. The parameters are:
+You can change configs in run_experiments() function for your own exploration. The parameters are:  
+
 **num_tasks**: number of examples used for simulation  
 **model**: the backend LLM  
 **num_candidate_plans**: number of plans the agent generates  
