@@ -104,7 +104,7 @@ You can name the dataset directory whatever you prefer (e.g., `dataset/`).
 ---
 ### 4. Run our Recommendation Agent
 
-First, setup configurations in ```run_experiments()```. The parameters are:  
+Setup configurations in ```run_experiments()``` in ```CS245_RecAgent.py```. The parameters are:  
 
 **num_tasks**: number of examples used for simulation  
 **model**: the backend LLM  
