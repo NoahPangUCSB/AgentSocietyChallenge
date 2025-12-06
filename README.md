@@ -8,16 +8,7 @@
 [![Competition Link](https://img.shields.io/badge/competition-link-orange)](https://www.codabench.org/competitions/4574/) &ensp;
 [![arXiv](https://img.shields.io/badge/arXiv-2502.18754-b31b1b.svg)](https://arxiv.org/abs/2502.18754)
 
-Welcome to the **WWW'25 AgentSociety Challenge**! This repository provides the tools and framework needed to participate in a competition that focuses on building **LLM Agents** for **user behavior simulation** and **recommendation systems** based on open source datasets.
-
-Participants are tasked with developing intelligent agents that interact with a simulated environment and perform specific tasks in two competition tracks:
-1. **User Behavior Simulation Track**: Agents simulate user behavior, including generating reviews and ratings.
-2. **Recommendation Track**: Agents generate recommendations based on provided contextual data.
-
-This repository includes:
-- The core library `websocietysimulator` for environment simulation.
-- Scripts for dataset processing and analysis.
-- Example usage for creating and evaluating agents.
+This repository contains our custome LLM-based recommendation agent built for the **WWW'25 AgentSociety Challenge**. Our work focuses exclusively on the **Recommendation Track**, where the goal is to design agents that can generate high-quality, context-aware item recommendations in a simulated environment based on open-source datasets.
 
 ---
 
