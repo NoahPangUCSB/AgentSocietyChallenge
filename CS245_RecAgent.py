@@ -390,8 +390,9 @@ class RecPlanning(PlanningBase):
 # =========================
 
 class RecMemory(MemoryBase):
-    def __init__(self, llm):
+    def __init__(self, llm, num_memories: int = 1):
         super().__init__(memory_type='recall', llm=llm)
+        self.num_memories = num_memories
 
     def retriveMemory(self, query_scenario: str):
         task_name = query_scenario
@@ -400,7 +401,7 @@ class RecMemory(MemoryBase):
             return ''
 
         similarity_results = self.scenario_memory.similarity_search_with_score(
-            task_name, k=1
+            task_name, k=self.num_memories
         )
 
         task_trajectories = [
@@ -714,18 +715,17 @@ def run_experiments():
             "task_set": ["yelp"],
             "num_tasks": [50],
             "model": ["gemini-2.5-flash-lite"],
-            "num_candidate_plans": [0],
-            "use_plan": [False],
+            "num_candidate_plans": [0, 1, 3],
+            "use_plan": [True, False],
             "extra_thinking_tokens": [True, False],
-            "memory": [True, False]
+            "memory": [True],
+            "num_memories": [3],
         }
     ]    
 
     # Setup
     load_dotenv()
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    gemini_llm = GeminiLLM(api_key=GEMINI_API_KEY, model="gemini-2.5-flash-lite")
-    ollama_llm = OllamaLLM(model="llama3")
     evaluator = RecommendationEvaluator()
     logger = logging.getLogger("websocietysimulator")
     # Use simulator to load data and tasks and groundtruths, but use own evaluation implementation for memory purposes
@@ -746,72 +746,73 @@ def run_experiments():
                         for use_plan in config["use_plan"]:
                             for extra_thinking_tokens in config["extra_thinking_tokens"]:
                                 for memory_enabled in config["memory"]:
-                                    orig_stdout = sys.stdout  # Save original stdout
-                                    f = open(f'task_set={task_set}-num_tasks={num_task}-model={model_name}-num_candidate_plans={num_candidate_plans}-use_plan={use_plan}-extra_thinking_tokens={extra_thinking_tokens}-memory={memory_enabled}', 'w')
-                                    sys.stdout = f  # Redirect stdout to the file
+                                    for num_memories in config["num_memories"]:
+                                        orig_stdout = sys.stdout  # Save original stdout
+                                        f = open(f'task_set={task_set}-num_tasks={num_task}-model={model_name}-num_candidate_plans={num_candidate_plans}-use_plan={use_plan}-extra_thinking_tokens={extra_thinking_tokens}-memory={memory_enabled}-num_memories={num_memories}', 'w')
+                                        sys.stdout = f  # Redirect stdout to the file
 
-                                    print(f"Running experiment with config: task_set={task_set}, num_tasks={num_task}, model={model_name}, num_candidate_plans={num_candidate_plans}, use_plan={use_plan}, extra_thinking_tokens={extra_thinking_tokens}, memory={memory_enabled}")
-                                    experiment_start_time = time.time()
-                                    # Initialize LLM
-                                    llm = gemini_llm if model_name.startswith("gemini") else ollama_llm
-                                    # Initialize memory
-                                    memory = RecMemory(llm=llm) if memory_enabled else None
-                                    # Initialize agent
-                                    agent = RecommendationAgentCS245(llm=llm, memory=memory)
-                                    # Set tasks
-                                    tasks = simulator.tasks[:num_task]
-                                    # Run tasks and collect results
-                                    predictions = []
-                                    # run tasks one by one to gather memory
-                                    for i in range(len(tasks)):
-                                        task_start_time = time.time()
-                                        task = tasks[i]
-                                        groundtruth = groundtruths[i]
-                                        agent.set_interaction_tool(simulator.interaction_tool)
-                                        agent.insert_task(task)
-                                        output = {}
-                                        try:
-                                            output = agent.workflow(n_candidate_plans=num_candidate_plans, use_plan=use_plan, extra_thinking_tokens=extra_thinking_tokens)
-                                            # set up memory
-                                            evaluation = evaluator.calculate_hr_at_n(
-                                                ground_truth=[groundtruth],
-                                                predictions=[output.get('result', [])],
-                                            )
-                                            metadata = output.get('metadata', {})
-                                            metadata['evaluation'] = str(evaluation)
-                                            print("Agent output:", output)
-                                            print(f"Evaluation for task {i}:", evaluation)
-                                            if(memory_enabled):
-                                                memory.addMemory(page_content=output.get('summary', ''), metadata=metadata)
-                                            logger.info(f"Simulation finished for task {i}")
-                                        except Exception as e:
-                                            logger.error(f"Task {i} failed with error: {str(e)}")
+                                        print(f"Running experiment with config: task_set={task_set}, num_tasks={num_task}, model={model_name}, num_candidate_plans={num_candidate_plans}, use_plan={use_plan}, extra_thinking_tokens={extra_thinking_tokens}, memory={memory_enabled}")
+                                        experiment_start_time = time.time()
+                                        # Initialize LLM
+                                        llm = GeminiLLM(api_key=GEMINI_API_KEY, model=model_name) if model_name.startswith("gemini") else OllamaLLM(model=model_name)
+                                        # Initialize memory
+                                        memory = RecMemory(llm=llm, num_memories=num_memories) if memory_enabled else None
+                                        # Initialize agent
+                                        agent = RecommendationAgentCS245(llm=llm, memory=memory)
+                                        # Set tasks
+                                        tasks = simulator.tasks[:num_task]
+                                        # Run tasks and collect results
+                                        predictions = []
+                                        # run tasks one by one to gather memory
+                                        for i in range(len(tasks)):
+                                            task_start_time = time.time()
+                                            task = tasks[i]
+                                            groundtruth = groundtruths[i]
+                                            agent.set_interaction_tool(simulator.interaction_tool)
+                                            agent.insert_task(task)
+                                            output = {}
+                                            try:
+                                                output = agent.workflow(n_candidate_plans=num_candidate_plans, use_plan=use_plan, extra_thinking_tokens=extra_thinking_tokens)
+                                                # set up memory
+                                                evaluation = evaluator.calculate_hr_at_n(
+                                                    ground_truth=[groundtruth],
+                                                    predictions=[output.get('result', [])],
+                                                )
+                                                metadata = output.get('metadata', {})
+                                                metadata['evaluation'] = str(evaluation)
+                                                print("Agent output:", output)
+                                                print(f"Evaluation for task {i}:", evaluation)
+                                                if(memory_enabled):
+                                                    memory.addMemory(page_content=output.get('summary', ''), metadata=metadata)
+                                                logger.info(f"Simulation finished for task {i}")
+                                            except Exception as e:
+                                                logger.error(f"Task {i} failed with error: {str(e)}")
+                                            
+                                            # add output for final evaluation
+                                            predictions.append(output.get('result', []))
+                                            task_end_time = time.time()
+                                            print(f"Task {i} completed in {task_end_time - task_start_time} seconds.")
+                                            logger.info(f"Task {i} completed in {task_end_time - task_start_time} seconds.")
                                         
-                                        # add output for final evaluation
-                                        predictions.append(output.get('result', []))
-                                        task_end_time = time.time()
-                                        print(f"Task {i} completed in {task_end_time - task_start_time} seconds.")
-                                        logger.info(f"Task {i} completed in {task_end_time - task_start_time} seconds.")
-                                    
-                                    logger.info("Simulation finished")
+                                        logger.info("Simulation finished")
 
-                                    evaluation_results_1 = evaluator.calculate_hr_at_n(
-                                        ground_truth=groundtruths[:num_task],
-                                        predictions=predictions,
-                                    )
-                                    evaluation_results_1 = {'type': 'recommendation', 'results': evaluation_results_1.__dict__}
-                                    evaluation_results_1['data_info'] = {
-                                            'evaluated_count': min(num_task, len(groundtruths)),
-                                            'original_simulation_count': num_task,
-                                            'original_ground_truth_count': len(groundtruths)
-                                    }
+                                        evaluation_results_1 = evaluator.calculate_hr_at_n(
+                                            ground_truth=groundtruths[:num_task],
+                                            predictions=predictions,
+                                        )
+                                        evaluation_results_1 = {'type': 'recommendation', 'results': evaluation_results_1.__dict__}
+                                        evaluation_results_1['data_info'] = {
+                                                'evaluated_count': min(num_task, len(groundtruths)),
+                                                'original_simulation_count': num_task,
+                                                'original_ground_truth_count': len(groundtruths)
+                                        }
 
-                                    print(f"Evaluation_results: {evaluation_results_1}")
-                                    experiment_end_time = time.time()
-                                    print(f"Experiment completed in {experiment_end_time - experiment_start_time} seconds.")
-                                    f.close()
-                                    sys.stdout = orig_stdout  # Reset stdout to original
-                                    logger.info(f"Experiment completed in {experiment_end_time - experiment_start_time} seconds.")
+                                        print(f"Evaluation_results: {evaluation_results_1}")
+                                        experiment_end_time = time.time()
+                                        print(f"Experiment completed in {experiment_end_time - experiment_start_time} seconds.")
+                                        f.close()
+                                        sys.stdout = orig_stdout  # Reset stdout to original
+                                        logger.info(f"Experiment completed in {experiment_end_time - experiment_start_time} seconds.")
     total_experiment_end_time = time.time()
     print(f"All experiments completed in {total_experiment_end_time - total_experiment_start_time} seconds.")
 
