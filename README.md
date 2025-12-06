@@ -78,7 +78,7 @@ The repository is organized using [Python Poetry](https://python-poetry.org/). F
 
 ### 2. Data Preparation
 
-1. Download the raw dataset from the Yelp[1], Amazon[2] or Goodreads[3].
+1. Download the raw dataset from the Yelp[1].
 2. Run the `data_process.py` script to process the dataset:
    ```bash
    python data_process.py --input <path_to_raw_dataset> --output <path_to_processed_dataset>
@@ -104,7 +104,7 @@ You can name the dataset directory whatever you prefer (e.g., `dataset/`).
 ---
 ### 4. Run our Recommendation Agent
 
-Setup configurations in ```run_experiments()``` in ```CS245_RecAgent.py```. The parameters are:  
+Setup the configurations in ```run_experiments()``` in ```CS245_RecAgent.py```. The parameters are:  
 
 **num_tasks**: number of examples used for simulation  
 **model**: the backend LLM  
