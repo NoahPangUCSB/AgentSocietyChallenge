@@ -32,7 +32,7 @@ Contains usage examples of the `websocietysimulator` library. Includes sample ag
 A script to process the raw Yelp dataset into the required format for use with the `websocietysimulator` library. This script ensures the dataset is cleaned and structured correctly for simulations.
 
 ### 4. **`CS245_RecAgent.py`** 
-Main script to run our recommendation agent variant 1.
+Main script to run our recommendation agent variant 1. You can change configs in run_experiment.py. 
 
 ### 5. **`CS245_RecAgent2.py`** 
 Main script to run our recommendation agent variant 2.
