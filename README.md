@@ -41,6 +41,7 @@ Main script to run our recommendation agent variant 1. You can change configs in
 **extra_thinking_tokens**: whether to use extra thinking tokens  
 **memory**: whether to activate memory module  
 
+**Usage**: ```python CS245_RecAgent.py```
 ### 5. **`CS245_RecAgent2.py`** 
 Main script to run our recommendation agent variant 2.
 
